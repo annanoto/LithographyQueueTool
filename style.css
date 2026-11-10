@@ -1,0 +1,61 @@
+/* Basic layout for the Module 1 build. Full design comes in Module 4.
+   Accent is the amber of a lithography cleanroom's safelight. */
+:root {
+  --ink: #1d232e;
+  --muted: #5a6372;
+  --rule: #d8dce2;
+  --surface: #ffffff;
+  --panel: #f3f5f8;
+  --accent: #b97a00;
+  --warn-bg: #fff4dc;
+  --pass: #2f7a3e;
+  --fail: #b3261e;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --ink: #e7eaef;
+    --muted: #a3abb8;
+    --rule: #39404c;
+    --surface: #161a21;
+    --panel: #1f242d;
+    --accent: #f0b43c;
+    --warn-bg: #3a2e12;
+    --pass: #6cc47e;
+    --fail: #f08a82;
+    color-scheme: dark;
+  }
+}
+
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  background: var(--surface);
+  color: var(--ink);
+  font: 16px/1.55 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+header, main, footer { max-width: 60rem; margin: 0 auto; padding: 0 1.25rem; }
+header { padding-top: 2.5rem; border-bottom: 3px solid var(--accent); padding-bottom: 1.25rem; }
+h1 { font-size: 2rem; line-height: 1.15; margin: 0 0 0.5rem; letter-spacing: -0.01em; }
+h2 { font-size: 1.15rem; margin: 2rem 0 0.75rem; }
+.lede { max-width: 42rem; margin: 0 0 0.75rem; color: var(--muted); }
+.notice { display: inline-block; margin: 0; padding: 0.4rem 0.7rem; background: var(--warn-bg); border-radius: 4px; font-size: 0.9rem; }
+.muted { color: var(--muted); font-size: 0.9rem; }
+code { font-size: 0.9em; }
+
+.scroll { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; font-size: 0.95rem; }
+th, td { text-align: left; padding: 0.45rem 0.6rem; border-bottom: 1px solid var(--rule); white-space: nowrap; }
+th { font-weight: 600; background: var(--panel); }
+td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+td.sym { color: var(--muted); }
+
+.warn { padding: 0.6rem 0.8rem; background: var(--warn-bg); border-left: 3px solid var(--accent); }
+pre { white-space: pre-wrap; background: var(--panel); padding: 0.75rem; border-radius: 4px; }
+
+#checks ul { list-style: none; padding: 0; margin: 0; }
+#checks li { padding: 0.3rem 0; }
+#checks li.pass { color: var(--pass); }
+#checks li.fail { color: var(--fail); font-weight: 600; }
+
+footer { margin-top: 3rem; padding-bottom: 2rem; border-top: 1px solid var(--rule); }

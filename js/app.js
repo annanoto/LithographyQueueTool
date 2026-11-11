@@ -45,11 +45,11 @@ function curveSVG(r, widthPx) {
   const step = yMax > 40 ? 10 : yMax > 16 ? 5 : yMax > 6 ? 2 : 1;
   let ticks = "";
   for (let w = 0; w <= yMax; w += step) {
-    ticks += `<line class="grid" x1="${m.l}" x2="${W - m.r}" y1="${Y(w)}" y2="${Y(w)}"/>
-      <text class="tick" x="${m.l - 10}" y="${Y(w) + 5}" text-anchor="end">${w}</text>`;
+    ticks += `<line class="grid" stroke="#c3c9d3" x1="${m.l}" x2="${W - m.r}" y1="${Y(w)}" y2="${Y(w)}"/>
+      <text class="tick" fill="#4a5466" font-size="14" x="${m.l - 10}" y="${Y(w) + 5}" text-anchor="end">${w}</text>`;
   }
   for (let p = 30; p <= 90; p += narrow ? 20 : 10) {
-    ticks += `<text class="tick" x="${X(p / 100)}" y="${H - m.b + 24}" text-anchor="middle">${p}%</text>`;
+    ticks += `<text class="tick" fill="#4a5466" font-size="14" x="${X(p / 100)}" y="${H - m.b + 24}" text-anchor="middle">${p}%</text>`;
   }
 
   let here = "";
@@ -57,23 +57,23 @@ function curveSVG(r, widthPx) {
     const hx = X(r.rho), hy = Y(r.Wq);
     const end = hx > W * 0.6;
     const tx = hx + (end ? -16 : 16);
-    here = `<line class="here-line" x1="${hx}" x2="${hx}" y1="${hy}" y2="${H - m.b}"/>
-      <circle class="here" cx="${hx}" cy="${hy}" r="9"/>
-      <text class="here-label" x="${tx}" y="${hy - 32}" text-anchor="${end ? "end" : "start"}">
+    here = `<line class="here-line" stroke="#131a26" stroke-dasharray="5 5" x1="${hx}" x2="${hx}" y1="${hy}" y2="${H - m.b}"/>
+      <circle class="here" fill="#d99100" stroke="#131a26" stroke-width="2.5" cx="${hx}" cy="${hy}" r="9"/>
+      <text class="here-label" fill="#131a26" font-size="16" font-weight="700" x="${tx}" y="${hy - 32}" text-anchor="${end ? "end" : "start"}">
         <tspan x="${tx}">This stepper</tspan>
         <tspan x="${tx}" dy="20">${pct(r.rho)} busy, ${fmt(r.Wq, 3)} h wait</tspan></text>`;
   }
 
   return `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Average wait rises sharply as utilization approaches 100 percent; this stepper is at ${pct(r.rho)} utilization with a ${fmt(r.Wq, 3)} hour wait.">
-    <rect class="zone" x="${X(0.85)}" y="${m.t}" width="${X(x1) - X(0.85)}" height="${H - m.t - m.b}"/>
-    <text class="zone-label" x="${X(x1)}" y="${m.t - 12}" text-anchor="end">${narrow ? "SMT2020 litho range" : "Where SMT2020’s lithography tools run"}</text>
+    <rect class="zone" fill="#fbe7b8" x="${X(0.85)}" y="${m.t}" width="${X(x1) - X(0.85)}" height="${H - m.t - m.b}"/>
+    <text class="zone-label" fill="#4a5466" font-size="13" x="${X(x1)}" y="${m.t - 12}" text-anchor="end">${narrow ? "SMT2020 litho range" : "Where SMT2020’s lithography tools run"}</text>
     ${ticks}
-    <line class="axis" x1="${m.l}" x2="${W - m.r}" y1="${H - m.b}" y2="${H - m.b}"/>
-    <line class="axis" x1="${m.l}" x2="${m.l}" y1="${m.t}" y2="${H - m.b}"/>
-    <path class="line" d="${path}"/>
+    <line class="axis" stroke="#131a26" stroke-width="2" x1="${m.l}" x2="${W - m.r}" y1="${H - m.b}" y2="${H - m.b}"/>
+    <line class="axis" stroke="#131a26" stroke-width="2" x1="${m.l}" x2="${m.l}" y1="${m.t}" y2="${H - m.b}"/>
+    <path class="line" fill="none" stroke="#131a26" stroke-width="4" stroke-linecap="round" d="${path}"/>
     ${here}
-    <text class="axis-label" x="${(W + m.l) / 2}" y="${H - 10}" text-anchor="middle">Utilization ρ</text>
-    <text class="axis-label" transform="translate(18 ${(H - m.b + m.t) / 2}) rotate(-90)" text-anchor="middle">Average wait (hours)</text>
+    <text class="axis-label" fill="#131a26" font-size="15" font-weight="700" x="${(W + m.l) / 2}" y="${H - 10}" text-anchor="middle">Utilization ρ</text>
+    <text class="axis-label" fill="#131a26" font-size="15" font-weight="700" transform="translate(18 ${(H - m.b + m.t) / 2}) rotate(-90)" text-anchor="middle">Average wait (hours)</text>
   </svg>`;
 }
 

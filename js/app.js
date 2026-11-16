@@ -162,8 +162,8 @@ function placeholderHTML() {
       <thead><tr><th>Item</th><th class="num">Value</th><th>Unit</th><th>Source</th><th>Status</th></tr></thead>
       <tbody>${items.map(([label, v, unit, src]) => {
         const ok = v != null && !!src;
-        return `<tr><td>${label}</td><td class="num">${v == null ? "—" : fmt(v, 8)}</td><td>${unit}</td>
-          <td>${src || "—"}</td><td class="${ok ? "pass" : "fail"}">${ok ? "Filled" : "Missing"}</td></tr>`;
+        return `<tr${ok ? "" : ' class="missing"'}><td>${label}</td><td class="num">${v == null ? "—" : fmt(v, 8)}</td><td>${unit}</td>
+          <td class="src">${src || "—"}</td><td class="${ok ? "pass" : "fail"}">${ok ? "Filled" : "Missing"}</td></tr>`;
       }).join("")}
       </tbody>
     </table>`;

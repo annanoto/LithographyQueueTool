@@ -47,6 +47,10 @@ h2 { margin: 0 0 1rem; font-size: 1.3rem; font-weight: 700; line-height: 1.25; }
 h3 { margin: 1.5rem 0 0.25rem; font-size: 1.1rem; }
 .muted { color: var(--ink-soft); font-size: 0.95rem; }
 
+/* A short note directly under a panel heading sits close to it, with room before the table */
+.panel > h2 + .muted { margin: -0.6rem 0 0.75rem; }
+.validation summary + .muted { margin: 0 0 0.75rem; }
+
 /* Key results band */
 .readout dl { margin: 0; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 1.25rem; }
 .readout div { background: var(--panel); border: 1px solid var(--rule); border-radius: var(--radius); padding: 1rem 1.25rem 1.1rem; border-top: 6px solid var(--rule-strong); }
@@ -82,7 +86,8 @@ h3 { margin: 1.5rem 0 0.25rem; font-size: 1.1rem; }
 .route li:last-child::before { background: var(--amber); color: #131a26; }
 .route li:not(:last-child)::after { content: ""; position: absolute; left: 1.03rem; top: 2.1rem; bottom: -0.9rem; border-left: 2px solid var(--rule); }
 .route h3 { margin: 0; font-size: 1.05rem; font-weight: 700; display: flex; justify-content: space-between; gap: 1rem; flex-wrap: wrap; }
-.route h3 span { font-weight: 800; white-space: nowrap; }
+/* The Downtime value holds two numbers (A and ce²), so let it wrap between them on narrow panels */
+.route h3 span { font-weight: 800; white-space: normal; text-align: right; }
 .route p { margin: 0.1rem 0 0; color: var(--ink-soft); font-size: 0.95rem; line-height: 1.4; }
 
 /* Tables */
@@ -94,6 +99,16 @@ tbody td { border-bottom: 1px solid var(--rule); }
 tbody tr:last-child td { border-bottom: 0; }
 .num { text-align: right; }
 td.sym { color: var(--ink-soft); }
+
+/* The steps table has 12 columns: wrap the headers so it stays readable before it has to scroll */
+#steps thead th { white-space: normal; vertical-align: bottom; min-width: 5.5rem; }
+
+/* Data to collect: sources are long, so they wrap; status uses the same pass/fail colors as the self-checks */
+td.src { white-space: normal; min-width: 16rem; color: var(--ink-soft); }
+td.pass { color: var(--pass); font-weight: 600; }
+td.fail { color: var(--fail); font-weight: 700; }
+#placeholders tr.missing td { background: var(--warn-bg); }
+#placeholders > p { margin: 0 0 0.75rem; font-weight: 700; }
 
 /* Validation */
 .validation summary { cursor: pointer; font-weight: 700; font-size: 1.1rem; }

@@ -119,6 +119,43 @@ function checks() {
   results.push({ name: "Litho_FE_98 matches hand-calc (λ, λ65, t0, c0², A, K, te, ce², ρ, Wq, CT)"
     + (misses.length ? ` — off: ${misses.join(", ")}` : ""), pass: misses.length === 0 });
 
+  // 15. What-if availability: scaling downtime frequency reaches the target A, and the data isn't changed.
+  const before = JSON.stringify(CalcRef.LITHO_FE_98);
+  const a80 = CalcRef.run(CalcRef.applyWhatIf(CalcRef.LITHO_FE_98, { availability: 0.8 }));
+  results.push({ name: "What-if availability 80%: A = 0.80 and the data object is unchanged",
+    pass: close(a80.A, 0.8) && JSON.stringify(CalcRef.LITHO_FE_98) === before });
+
+  // 16. What-if with no settings gives the hand-calc answer; rework 0% makes Step 65 visits = Product 3 releases.
+  const same = CalcRef.run(CalcRef.applyWhatIf(CalcRef.LITHO_FE_98, {}));
+  const noRw = CalcRef.run(CalcRef.applyWhatIf(CalcRef.LITHO_FE_98, { reworkProb: 0 }));
+  const s65 = noRw.stepSummary.find(s => s.step === 65), s72 = noRw.stepSummary.find(s => s.step === 72);
+  results.push({ name: "What-if: no settings = hand-calc; rework 0% → Step 65 visit rate = Step 72's",
+    pass: rel(same.Wq, 332.94824720, 1e-7) && close(s65.lambda, s72.lambda, 1e-12) });
+
+  // 17. Weekly cost of waiting = Lq x 168 h x $ per lot-hour.
+  results.push({ name: "Weekly cost = Lq × 168 h × $ per lot-hour",
+    pass: close(CalcRef.weeklyWaitCost({ stable: true, Lq: 2 }, 50), 2 * 168 * 50) && CalcRef.weeklyWaitCost({ stable: true, Lq: 2 }, null) === null });
+
+  // 18. Payback and ROI: Lq 10 -> 4 at $100/lot-h saves $100,800/week; a $201,600 fix pays back in
+  //     2 weeks, and over 52 weeks ROI = (100800 x 52 - 201600) / 201600 = 25.
+  const econ = CalcRef.fixEconomics({ stable: true, Lq: 10 }, { stable: true, Lq: 4 }, 201600, 100, 52);
+  results.push({ name: "Fix economics: savings $100,800/wk, payback 2 weeks, ROI 25×",
+    pass: close(econ.weeklySavings, 100800, 1e-6) && close(econ.paybackWeeks, 2) && close(econ.roi, 25) });
+
+  // 19. An over-capacity current state is reported, not turned into a misleading payback.
+  const bad = CalcRef.fixEconomics({ stable: false, Lq: Infinity }, { stable: true, Lq: 4 }, 1000, 100);
+  results.push({ name: "Over-capacity current state: no payback number, status says why",
+    pass: bad.status === "current-unstable" && bad.paybackWeeks === null });
+
+  // 20. Carrying cost: 25 wafers x $3,000 x 20% / 8,760 h = $1.712 per lot-hour (cost assumptions doc).
+  results.push({ name: "Carrying cost: 25 × $3,000 × 20% ÷ 8,760 h = $1.71 per lot-hour",
+    pass: close(CalcRef.carryingCostPerLotHour(25, 3000, 0.20), 75000 * 0.2 / 8760) && rel(CalcRef.carryingCostPerLotHour(25, 3000, 0.20), 1.712, 1e-3) });
+
+  // 21. Break-even: Lq 10 -> 4 (drop of 6) over 52 weeks; a $524,160 fix breaks even at
+  //     524160 / (6 x 168 x 52) = $10 per lot-hour.
+  results.push({ name: "Break-even cost of waiting: $524,160 fix, ΔLq = 6, 52 weeks → $10 per lot-hour",
+    pass: close(CalcRef.breakEvenWaitCost({ stable: true, Lq: 10 }, { stable: true, Lq: 4 }, 524160, 52), 10) });
+
   return results;
 }
 

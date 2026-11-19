@@ -1,6 +1,6 @@
 /*
   app.js — holds the inputs, runs the capacity (Phase 1) and financial (Phase 2) calculations,
-  and shows the results (pages: Results, Costs & fixes, Data, Check against hand calc).
+  and shows the results (pages: Results, Costs, Data, Check against hand calc).
   All times in MINUTES, rates and percentages as decimals (1.7% = 0.017).
   calc.js works in minutes (to match the hand-calc); the readout and chart convert waits to hours.
 
@@ -66,6 +66,7 @@ const inputs = {
       },
       source: "Derived: 25 wafers × wafer cost ($3,000 at 28nm [7]; $17,000 advanced [8]) × 20–30% carrying rate [9], [10] ÷ 8,760 h",
     },
+    // The next two are used for payback and ROI once scenarios are added (later module).
     extraStepper: {
       label: "Cost of an extra stepper", unit: "$ per tool",
       value: 14e6, low: 7e6, high: 34e6,  // KrF; i-line; dry ArF [1]. Tool speed fits these older classes.
@@ -76,13 +77,6 @@ const inputs = {
       value: 62500, low: 50000, high: 75000,  // Six Sigma worked examples [13]; $2–5M if a new resist is needed [17]
       source: "Illustrative Six Sigma examples, $50K–$75K [13]. A new resist would cost $2M–$5M [17].",
     },
-  },
-
-  // Fixes compared on the Costs & fixes page.
-  fixes: {
-    addSteppers: 1,
-    reworkTarget: { value: 0.005, source: "Bottom of the SMT2020 rework range (0.5%–2%); a similar relative cut to the 1.71 → 0.51 litho case [16]" },
-    horizonWeeks: { value: 260, source: "5 years, the amortization period used in [11]. Assumption." },
   },
 };
 
@@ -103,7 +97,6 @@ const hfmt = min => Number.isFinite(min) ? fmt(hrs(min), 3) : "∞";
 const $ = id => document.getElementById(id);
 const moneyFmt = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 });
 const money = x => x == null ? "—" : !Number.isFinite(x) ? "∞" : Math.abs(x) < 100 ? `$${x.toFixed(2)}` : moneyFmt.format(x);
-const yearsFmt = w => w == null ? "—" : !Number.isFinite(w) ? "Never" : w < 52 ? `${fmt(w, 3)} weeks` : `${fmt(w / 52, 3)} years`;
 const PAGES = ["results", "costs", "data", "check"];
 let base = null;
 
@@ -223,7 +216,8 @@ function renderResults() {
     item("Utilization", pct(r.rho), "") +
     item("Wait in queue", hfmt(r.Wq), "hours", true) +
     item("Time at tool group", hfmt(r.cycleTime), "hours") +
-    item("Lots waiting", fmt(r.Lq, 3), "lots");
+    item("Lots waiting", fmt(r.Lq, 3), "lots") +
+    item("Weekly delay cost", money(Calc.weeklyWaitCost(r, inputs.costs.waitingPerLotHour.value)), "");
 
   const el = $("curve");
   const wait = rho => hrs(Calc.sakasegawaWq(inputs.caSq, r.ceSq, rho, r.te, inputs.m));
@@ -267,8 +261,6 @@ function placeholderItems() {
     }
   }
   for (const c of Object.values(inputs.costs || {})) items.push([`${c.label} (base)`, c.value, c.unit, c.source]);
-  items.push(["Rework rate after the project", inputs.fixes.reworkTarget.value, "fraction", inputs.fixes.reworkTarget.source]);
-  items.push(["ROI and break-even period", inputs.fixes.horizonWeeks.value, "weeks", inputs.fixes.horizonWeeks.source]);
   return items;
 }
 
@@ -311,102 +303,41 @@ function renderData() {
 
 }
 
-/* ---------- Costs & fixes (Phase 2) ---------- */
-function scenarioList() {
-  return [
-    { key: "current", title: "Current state", change: `${inputs.m} steppers, ${pct(reworkRate(), 2)} rework`, whatIf: {} },
-    { key: "add", title: "Add a stepper", change: `${inputs.m} → ${inputs.m + inputs.fixes.addSteppers} steppers`,
-      whatIf: { m: inputs.m + inputs.fixes.addSteppers }, cost: inputs.costs.extraStepper },
-    { key: "cut", title: "Cut the rework rate", change: `Rework ${pct(reworkRate(), 2)} → ${pct(inputs.fixes.reworkTarget.value, 2)}`,
-      whatIf: { reworkProb: inputs.fixes.reworkTarget.value }, cost: inputs.costs.reworkProject },
-  ];
-}
-const reworkRate = () => (inputs.steps.find(s => s.reworkProb != null) || {}).reworkProb || 0;
-
+/* ---------- Costs (Phase 2: delay cost of the current state) ---------- */
 function renderCosts() {
-  const H = inputs.fixes.horizonWeeks.value, years = fmt(H / 52, 3);
+  const r = base, HPW = Calc.HOURS_PER_WEEK;
   const wait = inputs.costs.waitingPerLotHour;
-  const runs = Calc.runScenarios(inputs, scenarioList());
-  const cur = runs[0].result;
-  const HPW = Calc.HOURS_PER_WEEK;
+  const weekly = Calc.weeklyWaitCost(r, wait.value);
 
-  const cards = runs.map(sc => {
-    const r = sc.result;
-    const weekly = Calc.weeklyWaitCost(r, wait.value);
-    const rows = [
-      ["Utilization", pct(r.rho)],
-      ["Wait in queue", `${hfmt(r.Wq)} h`],
-      ["Lots waiting (L<sub>q</sub> = λ × W<sub>q</sub>)", fmt(r.Lq, 4)],
-      ["Weekly delay cost", money(weekly)],
-    ];
-    let worked = `Weekly delay cost = L<sub>q</sub> ${fmt(r.Lq, 4)} × ${HPW} h × ${money(wait.value)}`;
-    if (sc.cost) {
-      const e = Calc.fixEconomics(cur, r, sc.cost.value, wait.value, H);
-      const be = Calc.breakEvenWaitCost(cur, r, sc.cost.value, H);
-      sc.econ = e; sc.breakEven = be;
-      rows.push(
-        ["Weekly savings", money(e.weeklySavings)],
-        ["Cost of fix", money(sc.cost.value)],
-        ["Payback", yearsFmt(e.paybackWeeks)],
-        [`ROI over ${years} years`, e.roi == null ? "—" : pct(e.roi)],
-        [`Break-even cost of waiting`, be == null ? "—" : `${money(be)} /lot-h`],
-      );
-      if (e.status === "ok") worked += `<br>Payback = ${money(sc.cost.value)} ÷ ${money(e.weeklySavings)} per week`;
-    }
-    sc.rowsHtml = rows; sc.worked = worked;
-    return sc;
-  });
+  $("cost-answer").innerHTML = r.stable
+    ? `On average about <strong>${fmt(r.Lq, 3)} lots</strong> are waiting at ${inputs.toolGroup}. At ${money(wait.value)} per lot-hour, that waiting costs about <strong>${money(weekly)} a week</strong> (${money(weekly * 52)} a year) in holding cost.`
+    : `The steppers are over capacity, so the queue and its cost grow without limit.`;
 
-  const [, add, cut] = cards;
-  let best = null;
-  if (add.econ?.status === "ok" && cut.econ?.status === "ok") best = add.econ.paybackWeeks <= cut.econ.paybackWeeks ? "add" : "cut";
+  $("cost-worked").innerHTML = r.stable ? `
+    <ol class="worked-steps">
+      <li><span>Lots waiting, from Little’s Law</span>
+        <code>L<sub>q</sub> = λ × W<sub>q</sub> = ${fmt(r.lambda, 6)} visits/min × ${fmt(r.Wq, 6)} min = ${fmt(r.Lq, 6)} lots</code></li>
+      <li><span>Cost of waiting per lot-hour</span>
+        <code>25 wafers × ${money(wait.parts.base.waferCost)} × ${pct(wait.parts.base.carryingRate, 2)} ÷ 8,760 h = ${money(wait.value)}</code></li>
+      <li><span>Weekly delay cost</span>
+        <code>${fmt(r.Lq, 6)} lots × ${HPW} h × ${money(wait.value)} = ${money(weekly)}</code></li>
+    </ol>` : "";
 
-  $("cost-answer").innerHTML = (add.econ?.status === "ok" && cut.econ?.status === "ok")
-    ? `Counting only the holding cost of waiting lots (${money(wait.value)} per lot-hour), cutting rework to ${pct(inputs.fixes.reworkTarget.value, 2)} pays back in <strong>${yearsFmt(cut.econ.paybackWeeks)}</strong>. Adding a stepper saves far more each week but costs far more, so it takes <strong>${yearsFmt(add.econ.paybackWeeks)}</strong>.`
-    : `Payback can’t be worked out at these settings.`;
-
-  $("cost-scenarios").innerHTML = cards.map(sc => `
-    <article class="scenario${best === sc.key ? " best" : ""}">
-      ${best === sc.key ? `<p class="badge">Pays back sooner</p>` : ""}
-      <h3>${sc.title}</h3><p class="change">${sc.change}</p>
-      <dl>${sc.rowsHtml.map(([k, v]) => `<div><dt>${k}</dt><dd>${v}</dd></div>`).join("")}</dl>
-      <p class="worked">${sc.worked}</p>
-    </article>`).join("");
-
-  // Payback across the sourced range of waiting costs (base fix costs)
   const cases = [
-    ["28nm wafer, 20% carrying", wait.low], ["28nm wafer, 25% (base)", wait.value],
+    ["28nm wafer, 20% carrying", wait.low],
+    ["28nm wafer, 25% (base)", wait.value],
     ["28nm wafer, 30% carrying", Calc.carryingCostPerLotHour(25, wait.parts.low.waferCost, wait.parts.high.carryingRate)],
-    ["Advanced wafer, 20% carrying", Calc.carryingCostPerLotHour(25, wait.parts.high.waferCost, wait.parts.low.carryingRate)], ["Advanced wafer, 30% carrying", wait.high],
+    ["Advanced wafer, 20% carrying", Calc.carryingCostPerLotHour(25, wait.parts.high.waferCost, wait.parts.low.carryingRate)],
+    ["Advanced wafer, 30% carrying", wait.high],
   ];
-  $("cost-sensitivity").innerHTML = `
+  $("cost-range").innerHTML = `
     <table>
-      <thead><tr><th>Cost of waiting</th><th class="num">$ per lot-hour</th><th class="num">Weekly delay cost now</th>
-        <th class="num">Add a stepper: payback</th><th class="num">Cut rework: payback</th></tr></thead>
+      <thead><tr><th>Cost of waiting</th><th class="num">$ per lot-hour</th><th class="num">Weekly delay cost</th><th class="num">Yearly delay cost</th></tr></thead>
       <tbody>${cases.map(([label, c]) => {
-        const pa = Calc.fixEconomics(cur, add.result, add.cost.value, c, H).paybackWeeks;
-        const pc = Calc.fixEconomics(cur, cut.result, cut.cost.value, c, H).paybackWeeks;
-        return `<tr><td>${label}</td><td class="num">${money(c)}</td><td class="num">${money(Calc.weeklyWaitCost(cur, c))}</td>
-          <td class="num">${yearsFmt(pa)}</td><td class="num">${yearsFmt(pc)}</td></tr>`;
+        const w = Calc.weeklyWaitCost(r, c);
+        return `<tr><td>${label}</td><td class="num">${money(c)}</td><td class="num">${money(w)}</td><td class="num">${money(w * 52)}</td></tr>`;
       }).join("")}</tbody>
     </table>`;
-
-  // Break-even cost of waiting for each fix cost in the sourced range
-  const beRows = [
-    [add, "Stepper, i-line (low)", add.cost.low], [add, "Stepper, KrF (base)", add.cost.value], [add, "Stepper, dry ArF (high)", add.cost.high],
-    [cut, "Project, low", cut.cost.low], [cut, "Project, base", cut.cost.value], [cut, "Project, high", cut.cost.high],
-    [cut, "Project with a new resist", 2e6],
-  ];
-  $("cost-breakeven").innerHTML = `
-    <table>
-      <thead><tr><th>Fix</th><th class="num">Cost</th><th class="num">Break-even cost of waiting</th><th>Within the sourced $${wait.low.toFixed(2)}–$${wait.high.toFixed(2)}?</th></tr></thead>
-      <tbody>${beRows.map(([sc, label, cost]) => {
-        const be = Calc.breakEvenWaitCost(cur, sc.result, cost, H);
-        const verdict = be == null ? "—" : be <= wait.low ? "Yes, even at the low end" : be <= wait.high ? "Only at higher wafer values" : "No, above the range";
-        return `<tr><td>${label}</td><td class="num">${money(cost)}</td><td class="num">${be == null ? "—" : `${money(be)} per lot-hour`}</td><td>${verdict}</td></tr>`;
-      }).join("")}</tbody>
-    </table>
-    <p class="muted">Break-even = cost of the fix ÷ (drop in L<sub>q</sub> × ${HPW} h × ${H} weeks): the cost of waiting at which the fix pays for itself in ${years} years.</p>`;
 
   const c = inputs.costs;
   const rangeTxt = x => `${money(x.low)} – ${money(x.high)}`;
@@ -416,8 +347,6 @@ function renderCosts() {
       <tbody>
         ${[c.waitingPerLotHour, c.extraStepper, c.reworkProject].map(x =>
           `<tr><td>${x.label} <span class="muted">(${x.unit})</span></td><td class="num">${money(x.value)}</td><td class="num">${rangeTxt(x)}</td><td class="src">${x.source}</td></tr>`).join("")}
-        <tr><td>Rework rate after the project</td><td class="num">${pct(inputs.fixes.reworkTarget.value, 2)}</td><td class="num">—</td><td class="src">${inputs.fixes.reworkTarget.source}</td></tr>
-        <tr><td>ROI and break-even period</td><td class="num">${years} years</td><td class="num">—</td><td class="src">${inputs.fixes.horizonWeeks.source}</td></tr>
         <tr><td>Hours per week</td><td class="num">${HPW}</td><td class="num">—</td><td class="src">The SMT2020 fab runs around the clock.</td></tr>
       </tbody>
     </table>`;

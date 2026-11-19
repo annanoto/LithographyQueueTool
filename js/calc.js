@@ -1,6 +1,6 @@
 /*
   calc.js — Phase 1: capacity calculations for one lithography tool group (G/G/m).
-            Phase 2: scenarios and financial calculations (delay cost, payback, ROI).
+            Phase 2: financial calculations (delay cost, payback, ROI).
   Every time is in MINUTES (to match the hand-calc). Rates are per minute.
   Percentages are decimals (1.7% = 0.017). Hour conversions are returned at the end.
   Formulas match the Calculations doc for Litho_FE_98 (SMT2020).
@@ -207,46 +207,9 @@ const Calc = (() => {
     };
   }
 
-  // ---- Phase 2: scenarios and financial calculations ----
-
-  // Returns a copy of the inputs with what-if settings applied; the original is never changed.
-  // Any setting left undefined keeps the data value.
-  //   m            number of tools
-  //   caSq         arrival variability
-  //   reworkProb   replaces the rework probability on every step that has a rework loop
-  //                (a step with reworkProb set; in the Litho_FE_98 data, Product 3 Step 65)
-  //   availability target A, reached by making every downtime source happen more or less often
-  //                (each interval mf divided by the same factor; durations unchanged)
-  function applyWhatIf(inputs, whatIf = {}) {
-    const out = {
-      ...inputs,
-      steps: inputs.steps.map(s => ({ ...s })),
-      interruptions: (inputs.interruptions || []).map(d => ({ ...d })),
-    };
-    if (whatIf.m != null) out.m = whatIf.m;
-    if (whatIf.caSq != null) out.caSq = whatIf.caSq;
-    if (whatIf.reworkProb != null) {
-      out.steps.forEach(s => { if (s.reworkProb != null) s.reworkProb = whatIf.reworkProb; });
-    }
-    if (whatIf.availability != null) {
-      const A = whatIf.availability;
-      if (!(A > 0 && A <= 1)) throw new Error("Availability must be between 0 and 1 (e.g., 0.877, not 87.7).");
-      const R = out.interruptions.reduce((sum, d) => sum + d.mrMin / d.mfMin, 0);
-      const targetR = 1 / A - 1;
-      if (R > 0) {
-        const factor = targetR / R;
-        out.interruptions.forEach(d => { d.mfMin = factor > 0 ? d.mfMin / factor : Infinity; });
-      } else if (targetR > 0) {
-        throw new Error("Availability can only be changed when at least one downtime source is entered.");
-      }
-    }
-    return out;
-  }
-
-  // Runs each scenario (a set of what-if settings) on the same inputs.
-  function runScenarios(inputs, scenarios) {
-    return scenarios.map(sc => ({ ...sc, result: run(applyWhatIf(inputs, sc.whatIf || {})) }));
-  }
+  // ---- Phase 2: financial calculations ----
+  // fixEconomics and breakEvenWaitCost compare a "before" and an "after" result;
+  // the scenarios that produce those results come in a later module.
 
   // The SMT2020 fab runs around the clock, so a week is 168 hours.
   const HOURS_PER_WEEK = 168;
@@ -329,7 +292,7 @@ const Calc = (() => {
   return {
     productReleaseRate, arrivalRates, lotTime, jobMix, stepSummary, downtimeScv,
     effectiveTime, utilization, sakasegawaWq, validate, run,
-    applyWhatIf, runScenarios, HOURS_PER_WEEK, carryingCostPerLotHour, weeklyWaitCost, fixEconomics,
+    HOURS_PER_WEEK, carryingCostPerLotHour, weeklyWaitCost, fixEconomics,
     breakEvenWaitCost, LITHO_FE_98,
   };
 })();

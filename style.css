@@ -1,21 +1,27 @@
 /*
-  Built to project well: light background, dark high-contrast text, large type, sturdy lines.
-  Always light, even when the presenting laptop is in dark mode.
-  Amber (the lithography safelight) is the accent, used for graphics only,
-  never for text, because amber text washes out on a projector.
+  Color scheme: the group palette (#161d1e, #f3f3f3, #cccccc, #999999, #666666,
+  #03515f, #95b9ac, #97d6dd, #bb963d, #995656). White is used for panels only.
+  Built to project well: light page, dark high-contrast text, large type, sturdy lines.
+  Teal carries headings and interface accents. Gold marks the result that matters (graphics only:
+  gold text is too faint on a light background). Muted red is for warnings and failed checks.
 */
 :root {
-  --bg: #fbfcfd;
+  --bg: #f3f3f3;
   --panel: #ffffff;
-  --ink: #131a26;
-  --ink-soft: #4a5466;
-  --rule: #c3c9d3;
-  --rule-strong: #131a26;
-  --amber: #d99100;
-  --amber-tint: #fbe7b8;
-  --warn-bg: #fff1d1;
-  --pass: #1f6b30;
-  --fail: #b3261e;
+  --ink: #161d1e;
+  --ink-soft: #666666;
+  --rule: #cccccc;
+  --rule-mid: #999999;
+  --rule-strong: #161d1e;
+  --teal: #03515f;
+  --sage: #95b9ac;
+  --cyan: #97d6dd;
+  --gold: #bb963d;
+  --red: #995656;
+  --cyan-tint: rgba(151, 214, 221, 0.45);   /* #97d6dd, lightened for chart bands */
+  --red-tint: rgba(153, 86, 86, 0.12);      /* #995656, lightened for warning backgrounds */
+  --pass: var(--teal);
+  --fail: var(--red);
   --radius: 10px;
   color-scheme: only light;
 }
@@ -30,12 +36,14 @@ body {
   font-variant-numeric: tabular-nums;
 }
 .notice { margin-top: 1rem; margin-bottom: 0; font-size: 0.95rem; color: var(--ink-soft); }
-:focus-visible { outline: 3px solid var(--amber); outline-offset: 2px; }
+:focus-visible { outline: 3px solid var(--gold); outline-offset: 2px; }
 
 .top, .notice, main, footer { max-width: 78rem; margin-inline: auto; padding-inline: clamp(1rem, 3vw, 2rem); }
 
 /* Header */
-.top { display: flex; justify-content: space-between; align-items: flex-end; gap: 1.5rem; padding-top: 2rem; padding-bottom: 1.25rem; border-bottom: 4px solid var(--amber); }
+.top { display: flex; justify-content: space-between; align-items: flex-end; gap: 1.5rem; padding-top: 2rem; padding-bottom: 1.5rem; color: var(--bg); background: var(--teal);
+  box-shadow: 0 0 0 100vmax var(--teal); clip-path: inset(0 -100vmax); border-bottom: 0; }
+.top .lede { color: var(--cyan); }
 h1 { margin: 0 0 0.35rem; font-size: clamp(2rem, 4vw, 2.9rem); font-weight: 800; line-height: 1.05; letter-spacing: -0.02em; }
 .lede { margin: 0; max-width: 46rem; font-size: 1.15rem; color: var(--ink-soft); }
 code { font-size: 0.92em; font-weight: 600; }
@@ -43,7 +51,7 @@ code { font-size: 0.92em; font-weight: 600; }
 main { display: grid; gap: 1.25rem; padding-top: 1.5rem; }
 section, details { margin: 0; }
 .panel { background: var(--panel); border: 1px solid var(--rule); border-radius: var(--radius); padding: 1.25rem 1.5rem; }
-h2 { margin: 0 0 1rem; font-size: 1.3rem; font-weight: 700; line-height: 1.25; }
+h2 { margin: 0 0 1rem; font-size: 1.3rem; font-weight: 700; line-height: 1.25; color: var(--teal); }
 h3 { margin: 1.5rem 0 0.25rem; font-size: 1.1rem; }
 .muted { color: var(--ink-soft); font-size: 0.95rem; }
 
@@ -53,7 +61,8 @@ h3 { margin: 1.5rem 0 0.25rem; font-size: 1.1rem; }
 /* Key results band */
 .readout { margin: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr)); gap: 1rem; }
 .readout > div { background: var(--panel); border: 1px solid var(--rule); border-radius: var(--radius); padding: 1rem 1.25rem 1.1rem; border-top: 6px solid var(--rule-strong); }
-.readout > div.key { border-top-color: var(--amber); }
+.readout > div { border-top-color: var(--teal); }
+.readout > div.key { border-top-color: var(--gold); }
 .readout dt { font-size: 1rem; font-weight: 600; color: var(--ink-soft); }
 .readout dd { margin: 0.2rem 0 0; font-size: clamp(2rem, 3.4vw, 2.9rem); font-weight: 800; line-height: 1.05; letter-spacing: -0.02em; }
 .readout dd small { display: block; margin-top: 0.15rem; font-size: 1.05rem; font-weight: 600; color: var(--ink-soft); letter-spacing: 0; }
@@ -66,11 +75,11 @@ h3 { margin: 1.5rem 0 0.25rem; font-size: 1.1rem; }
 .chart .grid { stroke: var(--rule); stroke-width: 1; }
 .chart .tick { fill: var(--ink-soft); font-size: 14px; font-family: inherit; }
 .chart .axis-label { fill: var(--ink); font-size: 15px; font-weight: 700; font-family: inherit; }
-.chart .zone { fill: var(--amber-tint); }
+.chart .zone { fill: var(--cyan-tint); }
 .chart .zone-label { fill: var(--ink-soft); font-size: 13px; font-weight: 600; font-family: inherit; }
-.chart .line { fill: none; stroke: var(--ink); stroke-width: 4; stroke-linecap: round; }
+.chart .line { fill: none; stroke: var(--teal); stroke-width: 4; stroke-linecap: round; }
 .chart .here-line { stroke: var(--ink); stroke-width: 1.5; stroke-dasharray: 5 5; }
-.chart .here { fill: var(--amber); stroke: var(--ink); stroke-width: 2.5; }
+.chart .here { fill: var(--gold); stroke: var(--ink); stroke-width: 2.5; }
 .chart .line.alt { stroke: var(--ink-soft); stroke-width: 3; stroke-dasharray: 9 7; }
 .chart .ghost { fill: var(--panel); stroke: var(--ink-soft); stroke-width: 2.5; }
 .chart .here-label { fill: var(--ink); font-size: 16px; font-weight: 700; font-family: inherit; }
@@ -81,10 +90,10 @@ h3 { margin: 1.5rem 0 0.25rem; font-size: 1.1rem; }
   content: counter(s); position: absolute; left: 0; top: 0;
   width: 2.1rem; height: 2.1rem; border-radius: 50%;
   display: grid; place-items: center; font-weight: 800;
-  background: var(--ink); color: var(--panel);
+  background: var(--teal); color: var(--panel);
 }
-.route li:last-child::before { background: var(--amber); color: #131a26; }
-.route li:not(:last-child)::after { content: ""; position: absolute; left: 1.03rem; top: 2.1rem; bottom: -0.9rem; border-left: 2px solid var(--rule); }
+.route li:last-child::before { background: var(--gold); color: var(--ink); }
+.route li:not(:last-child)::after { content: ""; position: absolute; left: 1.03rem; top: 2.1rem; bottom: -0.9rem; border-left: 2px solid var(--sage); }
 .route h3 { margin: 0; font-size: 1.05rem; font-weight: 700; display: flex; justify-content: space-between; gap: 1rem; flex-wrap: wrap; }
 /* The Downtime value holds two numbers (A and ce²), so let it wrap between them on narrow panels */
 .route h3 span { font-weight: 800; white-space: normal; text-align: right; }
@@ -94,7 +103,7 @@ h3 { margin: 1.5rem 0 0.25rem; font-size: 1.1rem; }
 .scroll { overflow-x: auto; }
 table { width: 100%; border-collapse: collapse; font-size: 1.02rem; }
 th, td { text-align: left; padding: 0.65rem 0.8rem; white-space: nowrap; }
-thead th { font-weight: 700; border-bottom: 2px solid var(--rule-strong); }
+thead th { font-weight: 700; border-bottom: 2px solid var(--teal); }
 tbody td { border-bottom: 1px solid var(--rule); }
 tbody tr:last-child td { border-bottom: 0; }
 .num { text-align: right; }
@@ -107,12 +116,12 @@ td.sym { color: var(--ink-soft); }
 td.src { white-space: normal; min-width: 16rem; color: var(--ink-soft); }
 td.pass { color: var(--pass); font-weight: 600; }
 td.fail { color: var(--fail); font-weight: 700; }
-#placeholders tr.missing td { background: var(--warn-bg); }
+#placeholders tr.missing td, #comparison tr.missing td { background: var(--red-tint); }
 #placeholders > p { margin: 0 0 0.75rem; font-weight: 700; }
 
 /* Messages */
-.warn { margin: 0 0 1rem; padding: 0.75rem 1rem; background: var(--warn-bg); border-left: 5px solid var(--fail); border-radius: 4px; font-weight: 600; }
-pre { white-space: pre-wrap; font-family: inherit; background: var(--warn-bg); padding: 0.75rem 1rem; border-radius: 4px; }
+.warn { margin: 0 0 1rem; padding: 0.75rem 1rem; background: var(--red-tint); border-left: 5px solid var(--fail); border-radius: 4px; font-weight: 600; }
+pre { white-space: pre-wrap; font-family: inherit; background: var(--red-tint); padding: 0.75rem 1rem; border-radius: 4px; }
 #checks p { margin: 0.5rem 0; font-weight: 700; }
 #checks ul { list-style: none; padding: 0; margin: 0; columns: 2 20rem; column-gap: 2rem; }
 #checks li { padding: 0.25rem 0; break-inside: avoid; }
@@ -139,7 +148,7 @@ footer p { margin: 0 0 0.2rem; }
   border-bottom: 5px solid transparent;
 }
 .tabs a:hover { color: var(--ink); }
-.tabs a[aria-current="page"] { color: var(--ink); border-bottom-color: var(--amber); }
+.tabs a[aria-current="page"] { color: var(--teal); border-bottom-color: var(--gold); }
 
 .page { display: grid; gap: 1.25rem; }
 a { color: var(--ink); font-weight: 600; }
@@ -150,26 +159,14 @@ a { color: var(--ink); font-weight: 600; }
 .warn-text { color: var(--fail); font-weight: 700; }
 .was { margin: 0.35rem 0 0; font-size: 0.9rem; color: var(--ink-soft); }
 
-/* ---------- Costs & fixes ---------- */
-.scenarios { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1.25rem; align-items: start; }
-.scenario { position: relative; background: var(--panel); border: 1px solid var(--rule); border-top: 6px solid var(--rule-strong); border-radius: var(--radius); padding: 1.1rem 1.25rem 1.25rem; }
-.scenario.best { border: 2px solid var(--ink); border-top: 6px solid var(--amber); }
-.scenario h3 { margin: 0; font-size: 1.25rem; }
-.scenario .change { margin: 0.15rem 0 0.75rem; color: var(--ink-soft); font-weight: 600; }
-.scenario dl { margin: 0; }
-.scenario dl div { display: flex; justify-content: space-between; gap: 1rem; padding: 0.45rem 0; border-bottom: 1px solid var(--rule); }
-.scenario dl div:last-child { border-bottom: 0; }
-.scenario dt { color: var(--ink-soft); }
-.scenario dd { margin: 0; font-weight: 800; text-align: right; white-space: nowrap; }
-.scenario .worked { margin: 0.75rem 0 0; padding-top: 0.6rem; border-top: 2px solid var(--rule); font-size: 0.85rem; color: var(--ink-soft); line-height: 1.45; }
-.badge { position: absolute; top: -0.85rem; right: 1rem; margin: 0; padding: 0.1rem 0.6rem; font-size: 0.85rem; font-weight: 800; background: var(--ink); color: var(--panel); border-radius: 999px; }
-#cost-breakeven > .muted, .limits { margin: 0.75rem 0 0; }
+/* ---------- Costs ---------- */
+.worked-steps { margin: 0; padding-left: 1.4rem; display: grid; gap: 0.9rem; }
+.worked-steps span { display: block; font-weight: 700; }
+.worked-steps code { display: inline-block; margin-top: 0.2rem; font-weight: 500; white-space: normal; }
+.limits { margin: 0.75rem 0 0; }
 #cost-assumptions td.src { min-width: 22rem; }
 
 /* ---------- Narrow screens ---------- */
-@media (max-width: 64rem) {
-  .scenarios { grid-template-columns: 1fr; }
-}
 @media (max-width: 40rem) {
   #readout { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }

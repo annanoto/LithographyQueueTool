@@ -7,63 +7,105 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=4">
-  <script src="js/calc.js?v=4" defer></script>
-  <script src="js/tests.js?v=4" defer></script>
-  <script src="js/app.js?v=4" defer></script>
+  <link rel="stylesheet" href="style.css?v=7">
+  <script src="js/calc.js?v=7" defer></script>
+  <script src="js/tests.js?v=7" defer></script>
+  <script src="js/app.js?v=7" defer></script>
 </head>
 <body>
   <header class="top">
     <div class="title">
       <h1>Lithography queue tool</h1>
-      <p class="lede">How long lots wait at one group of lithography steppers, using SMT2020 benchmark fab data and the Sakasegawa approximation for parallel tools (G/G/m).</p>
+      <p class="lede">How long lots wait for the Litho_FE_98 steppers, what that wait costs, and whether adding a stepper or cutting rework pays off. Calculated from SMT2020 benchmark fab data.</p>
     </div>
   </header>
 
-  <p class="notice">Module 1 build: tool group Litho_FE_98 from the SMT2020 data. Cost assumptions are still placeholders. Edit inputs in <code>js/app.js</code>.</p>
+  <nav class="tabs" aria-label="Pages">
+    <div class="tabs-inner">
+      <a href="#results" data-page="results">Results</a>
+      <a href="#costs" data-page="costs">Costs &amp; fixes</a>
+      <a href="#data" data-page="data">Data</a>
+      <a href="#check" data-page="check">Check against hand calc</a>
+    </div>
+  </nav>
+
+  <p class="notice">Phases 1 and 2: capacity and financial calculations on SMT2020 data. Interactive inputs come later.</p>
 
   <main>
-    <section class="readout" aria-label="Key results">
-      <dl id="readout"></dl>
+    <!-- Results -->
+    <section id="page-results" class="page">
+      <p id="answer" class="answer"></p>
+      <dl id="readout" class="readout"></dl>
+      <div class="pair">
+        <div class="panel">
+          <h2>Wait climbs steeply as the steppers fill up</h2>
+          <div id="curve" class="chart"></div>
+          <p class="muted">The curve holds everything else fixed and changes only the load. Near 100% busy, a small rise in load causes a large jump in wait.</p>
+        </div>
+        <div class="panel">
+          <h2>How the wait is calculated</h2>
+          <ol id="route" class="route"></ol>
+        </div>
+      </div>
     </section>
 
-    <section class="pair">
+    <!-- Costs & fixes -->
+    <section id="page-costs" class="page" hidden>
+      <p id="cost-answer" class="answer"></p>
+      <div id="cost-scenarios" class="scenarios"></div>
+
       <div class="panel">
-        <h2>Wait climbs steeply as the tool group fills up</h2>
-        <div id="curve"></div>
+        <h2>How payback changes with the cost of waiting</h2>
+        <p class="muted">No published figure exists for the cost of a waiting lot, so here is the full sourced range. Fix costs at their base values.</p>
+        <div id="cost-sensitivity" class="scroll"></div>
+      </div>
+
+      <div class="panel">
+        <h2>What the cost of waiting would need to be</h2>
+        <p class="muted">The cost per lot-hour at which each fix pays for itself, compared with the sourced range.</p>
+        <div id="cost-breakeven" class="scroll"></div>
+      </div>
+
+      <div class="panel">
+        <h2>Cost assumptions</h2>
+        <p class="muted">From the Litho Rework Cost Assumptions doc; numbers in brackets are its sources. Edit them in <code>js/app.js</code>.</p>
+        <div id="cost-assumptions" class="scroll"></div>
+        <p class="muted limits">The cost of waiting here is holding cost only. Waiting also delays revenue and can lower yield, and at a bottleneck the bigger cost is lost output, which this figure doesn’t include.</p>
+      </div>
+    </section>
+
+    <!-- Data -->
+    <section id="page-data" class="page" hidden>
+      <div class="panel">
+        <h2>Lithography steps at this tool group</h2>
+        <p class="muted">One row for each step and lot type. Times in minutes.</p>
+        <div id="steps" class="scroll"></div>
       </div>
       <div class="panel">
-        <h2>How the wait is calculated</h2>
-        <ol id="route" class="route"></ol>
+        <h2>Breakdowns and scheduled maintenance</h2>
+        <p class="muted">Downtime that sets availability and adds processing variability. Times in minutes.</p>
+        <div id="downtime" class="scroll"></div>
+      </div>
+      <div class="panel">
+        <h2>Data to collect</h2>
+        <p class="muted">Every input that needs a value and a source. Edit them in <code>js/app.js</code>.</p>
+        <div id="placeholders" class="scroll"></div>
       </div>
     </section>
 
-    <section class="panel">
-      <h2>Lithography steps at this tool group</h2>
-      <p class="muted">One row for each step and lot type. Times in minutes.</p>
-      <div id="steps" class="scroll"></div>
+    <!-- Check against hand calc -->
+    <section id="page-check" class="page" hidden>
+      <div class="panel">
+        <h2>Site vs. hand calculation</h2>
+        <p id="check-summary" class="answer"></p>
+        <div id="comparison" class="scroll"></div>
+      </div>
+      <div class="panel">
+        <h2>Self-checks</h2>
+        <p class="muted">The calculations tested against cases with known answers, such as the single-stepper Kingman case.</p>
+        <div id="checks"></div>
+      </div>
     </section>
-
-    <section class="panel">
-      <h2>Breakdowns and scheduled maintenance</h2>
-      <p class="muted">Downtime that sets availability and adds processing variability. Times in minutes.</p>
-      <div id="downtime" class="scroll"></div>
-    </section>
-
-    <section class="panel">
-      <h2>Data to collect</h2>
-      <p class="muted">Every input that needs a value and a source for the chosen tool group.</p>
-      <div id="placeholders" class="scroll"></div>
-    </section>
-
-    <details class="panel validation">
-      <summary>Validation: every value and the self-checks</summary>
-      <p class="muted">Values in minutes, to compare line by line with the hand calculation.</p>
-      <div id="results" class="scroll"></div>
-      <h3>Self-checks</h3>
-      <p class="muted">Module 1 tested against cases with known answers, such as the single-tool Kingman case, and against the Litho_FE_98 hand calculation.</p>
-      <div id="checks"></div>
-    </details>
   </main>
 
   <footer>

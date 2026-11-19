@@ -7,29 +7,29 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=7">
-  <script src="js/calc.js?v=7" defer></script>
-  <script src="js/tests.js?v=7" defer></script>
-  <script src="js/app.js?v=7" defer></script>
+  <link rel="stylesheet" href="style.css?v=9">
+  <script src="js/calc.js?v=9" defer></script>
+  <script src="js/tests.js?v=9" defer></script>
+  <script src="js/app.js?v=9" defer></script>
 </head>
 <body>
   <header class="top">
     <div class="title">
       <h1>Lithography queue tool</h1>
-      <p class="lede">How long lots wait for the Litho_FE_98 steppers, what that wait costs, and whether adding a stepper or cutting rework pays off. Calculated from SMT2020 benchmark fab data.</p>
+      <p class="lede">How long lots wait for the Litho_FE_98 steppers and what that wait costs, calculated from SMT2020 benchmark fab data.</p>
     </div>
   </header>
 
   <nav class="tabs" aria-label="Pages">
     <div class="tabs-inner">
       <a href="#results" data-page="results">Results</a>
-      <a href="#costs" data-page="costs">Costs &amp; fixes</a>
+      <a href="#costs" data-page="costs">Costs</a>
       <a href="#data" data-page="data">Data</a>
       <a href="#check" data-page="check">Check against hand calc</a>
     </div>
   </nav>
 
-  <p class="notice">Phases 1 and 2: capacity and financial calculations on SMT2020 data. Interactive inputs come later.</p>
+  <p class="notice">Phases 1 and 2: capacity and financial calculations on SMT2020 data. Scenarios and interactive inputs come later.</p>
 
   <main>
     <!-- Results -->
@@ -49,26 +49,24 @@
       </div>
     </section>
 
-    <!-- Costs & fixes -->
+    <!-- Costs -->
     <section id="page-costs" class="page" hidden>
       <p id="cost-answer" class="answer"></p>
-      <div id="cost-scenarios" class="scenarios"></div>
 
       <div class="panel">
-        <h2>How payback changes with the cost of waiting</h2>
-        <p class="muted">No published figure exists for the cost of a waiting lot, so here is the full sourced range. Fix costs at their base values.</p>
-        <div id="cost-sensitivity" class="scroll"></div>
+        <h2>How the delay cost is calculated</h2>
+        <div id="cost-worked"></div>
       </div>
 
       <div class="panel">
-        <h2>What the cost of waiting would need to be</h2>
-        <p class="muted">The cost per lot-hour at which each fix pays for itself, compared with the sourced range.</p>
-        <div id="cost-breakeven" class="scroll"></div>
+        <h2>Delay cost across the range of waiting costs</h2>
+        <p class="muted">No published figure exists for the cost of a waiting lot, so here is the full sourced range.</p>
+        <div id="cost-range" class="scroll"></div>
       </div>
 
       <div class="panel">
         <h2>Cost assumptions</h2>
-        <p class="muted">From the Litho Rework Cost Assumptions doc; numbers in brackets are its sources. Edit them in <code>js/app.js</code>.</p>
+        <p class="muted">From the Litho Rework Cost Assumptions doc; numbers in brackets are its sources. The stepper and project costs are used for payback and ROI once scenarios are added. Edit them in <code>js/app.js</code>.</p>
         <div id="cost-assumptions" class="scroll"></div>
         <p class="muted limits">The cost of waiting here is holding cost only. Waiting also delays revenue and can lower yield, and at a bottleneck the bigger cost is lost output, which this figure doesn’t include.</p>
       </div>

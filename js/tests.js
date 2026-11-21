@@ -123,25 +123,46 @@ function checks() {
   results.push({ name: "Weekly cost = Lq × 168 h × $ per lot-hour",
     pass: close(CalcRef.weeklyWaitCost({ stable: true, Lq: 2 }, 50), 2 * 168 * 50) && CalcRef.weeklyWaitCost({ stable: true, Lq: 2 }, null) === null });
 
-  // 18. Payback and ROI: Lq 10 -> 4 at $100/lot-h saves $100,800/week; a $201,600 fix pays back in
-  //     2 weeks, and over 52 weeks ROI = (100800 x 52 - 201600) / 201600 = 25.
-  const econ = CalcRef.fixEconomics({ stable: true, Lq: 10 }, { stable: true, Lq: 4 }, 201600, 100, 52);
-  results.push({ name: "Fix economics: savings $100,800/wk, payback 2 weeks, ROI 25×",
-    pass: close(econ.weeklySavings, 100800, 1e-6) && close(econ.paybackWeeks, 2) && close(econ.roi, 25) });
+  // 18. Payback and ROI (yearly): Lq 10 -> 4 at $100/lot-h saves 6 x 100 x 8,760 = $5,256,000/yr;
+  //     a $10,512,000 fix pays back in 2 years, and over 5 years ROI = (5,256,000 x 5 - 10,512,000) / 10,512,000 = 1.5.
+  const econ = CalcRef.fixEconomics({ stable: true, Lq: 10 }, { stable: true, Lq: 4 }, 10512000, 100, 5);
+  results.push({ name: "Fix economics: savings $5.256M/yr, payback 2 years, ROI 150% over 5 years",
+    pass: close(econ.annualSavings, 5256000, 1e-6) && close(econ.paybackYears, 2) && close(econ.roi, 1.5) });
+
+  // 18b. Yearly operating cost is subtracted from savings: $256,000/yr leaves $5,000,000 net.
+  const net = CalcRef.fixEconomics({ stable: true, Lq: 10 }, { stable: true, Lq: 4 }, 10000000, 100, 5, 256000);
+  results.push({ name: "Operating cost reduces net savings: $5.256M − $0.256M → payback 2 years",
+    pass: close(net.annualSavings, 5000000, 1e-6) && close(net.paybackYears, 2) });
+
+  // 18c. Yearly delay cost = Lq x h x 8,760 h (Detailed Calculations: 19.958 lots x h x 8,760).
+  results.push({ name: "Yearly delay cost = Lq × $ per lot-hour × 8,760 h",
+    pass: close(CalcRef.annualWaitCost({ stable: true, Lq: 2 }, 50), 2 * 50 * 8760) });
 
   // 19. An over-capacity current state is reported, not turned into a misleading payback.
   const bad = CalcRef.fixEconomics({ stable: false, Lq: Infinity }, { stable: true, Lq: 4 }, 1000, 100);
   results.push({ name: "Over-capacity current state: no payback number, status says why",
-    pass: bad.status === "current-unstable" && bad.paybackWeeks === null });
+    pass: bad.status === "current-unstable" && bad.paybackYears === null });
 
   // 20. Carrying cost: 25 wafers x $3,000 x 20% / 8,760 h = $1.712 per lot-hour (cost assumptions doc).
   results.push({ name: "Carrying cost: 25 × $3,000 × 20% ÷ 8,760 h = $1.71 per lot-hour",
     pass: close(CalcRef.carryingCostPerLotHour(25, 3000, 0.20), 75000 * 0.2 / 8760) && rel(CalcRef.carryingCostPerLotHour(25, 3000, 0.20), 1.712, 1e-3) });
 
-  // 21. Break-even: Lq 10 -> 4 (drop of 6) over 52 weeks; a $524,160 fix breaks even at
-  //     524160 / (6 x 168 x 52) = $10 per lot-hour.
-  results.push({ name: "Break-even cost of waiting: $524,160 fix, ΔLq = 6, 52 weeks → $10 per lot-hour",
-    pass: close(CalcRef.breakEvenWaitCost({ stable: true, Lq: 10 }, { stable: true, Lq: 4 }, 524160, 52), 10) });
+  // 21. Break-even: Lq 10 -> 4 (drop of 6) over 1 year; a $525,600 fix breaks even at
+  //     525600 / (6 x 8,760 x 1) = $10 per lot-hour.
+  results.push({ name: "Break-even cost of waiting: $525,600 fix, ΔLq = 6, 1 year → $10 per lot-hour",
+    pass: close(CalcRef.breakEvenWaitCost({ stable: true, Lq: 10 }, { stable: true, Lq: 4 }, 525600, 1), 10) });
+
+  // 22. Scenarios: no settings reproduces the hand calc; rework 0% makes Step 65 visits equal Step 72's;
+  //     the data object is never changed.
+  const before = JSON.stringify(CalcRef.LITHO_FE_98);
+  const [same, noRw, six] = CalcRef.runScenarios(CalcRef.LITHO_FE_98, [{ whatIf: {} }, { whatIf: { reworkProb: 0 } }, { whatIf: { m: 6 } }]).map(s => s.result);
+  const s65 = noRw.stepSummary.find(s => s.step === 65), s72 = noRw.stepSummary.find(s => s.step === 72);
+  results.push({ name: "Scenarios: no change = hand calc; rework 0% → Step 65 visits = Step 72's; data unchanged",
+    pass: rel(same.Wq, 332.94824720, 1e-7) && close(s65.lambda, s72.lambda, 1e-12) && JSON.stringify(CalcRef.LITHO_FE_98) === before });
+
+  // 23. Adding a stepper: same λ and te, utilization falls by 5/6.
+  results.push({ name: "Add a stepper (5 → 6): same λ and tₑ, utilization × 5/6",
+    pass: close(six.lambda, same.lambda) && close(six.te, same.te) && close(six.rho, same.rho * 5 / 6) });
 
   return results;
 }

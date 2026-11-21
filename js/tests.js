@@ -160,6 +160,18 @@ function checks() {
   results.push({ name: "Scenarios: no change = hand calc; rework 0% → Step 65 visits = Step 72's; data unchanged",
     pass: rel(same.Wq, 332.94824720, 1e-7) && close(s65.lambda, s72.lambda, 1e-12) && JSON.stringify(CalcRef.LITHO_FE_98) === before });
 
+  // 22b. Slider availability: scaling downtime frequency reaches the target A; at the data's own A nothing changes.
+  const a80 = CalcRef.run(CalcRef.applyWhatIf(CalcRef.LITHO_FE_98, { availability: 0.8 }));
+  const aSame = CalcRef.run(CalcRef.applyWhatIf(CalcRef.LITHO_FE_98, { availability: 0.87702712968 }));
+  results.push({ name: "Availability slider: 80% gives A = 0.80; the data’s own A reproduces the hand calc",
+    pass: close(a80.A, 0.8) && rel(aSame.Wq, 332.94824720, 1e-7) });
+
+  // 22c. Slider ca²: Wq scales with (ca² + ce²)/2, so ca² = 0 vs 2 changes Wq by (0 + ce²)/(2 + ce²).
+  const c0 = CalcRef.run(CalcRef.applyWhatIf(CalcRef.LITHO_FE_98, { caSq: 0 }));
+  const c2 = CalcRef.run(CalcRef.applyWhatIf(CalcRef.LITHO_FE_98, { caSq: 2 }));
+  results.push({ name: "Arrival variability slider: Wq in proportion to (cₐ² + cₑ²)",
+    pass: close(c0.Wq / c2.Wq, c0.ceSq / (2 + c2.ceSq), 1e-12) });
+
   // 23. Adding a stepper: same λ and te, utilization falls by 5/6.
   results.push({ name: "Add a stepper (5 → 6): same λ and tₑ, utilization × 5/6",
     pass: close(six.lambda, same.lambda) && close(six.te, same.te) && close(six.rho, same.rho * 5 / 6) });

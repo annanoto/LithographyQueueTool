@@ -7,29 +7,30 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=9">
-  <script src="js/calc.js?v=9" defer></script>
-  <script src="js/tests.js?v=9" defer></script>
-  <script src="js/app.js?v=9" defer></script>
+  <link rel="stylesheet" href="style.css?v=10">
+  <script src="js/calc.js?v=10" defer></script>
+  <script src="js/tests.js?v=10" defer></script>
+  <script src="js/app.js?v=10" defer></script>
 </head>
 <body>
   <header class="top">
     <div class="title">
       <h1>Lithography queue tool</h1>
-      <p class="lede">How long lots wait for the Litho_FE_98 steppers and what that wait costs, calculated from SMT2020 benchmark fab data.</p>
+      <p class="lede">How long lots wait for the Litho_FE_98 steppers, what that wait costs, and how two fixes compare, calculated from SMT2020 benchmark fab data.</p>
     </div>
   </header>
 
   <nav class="tabs" aria-label="Pages">
     <div class="tabs-inner">
       <a href="#results" data-page="results">Results</a>
+      <a href="#scenarios" data-page="scenarios">Scenarios</a>
       <a href="#costs" data-page="costs">Costs</a>
       <a href="#data" data-page="data">Data</a>
       <a href="#check" data-page="check">Check against hand calc</a>
     </div>
   </nav>
 
-  <p class="notice">Phases 1 and 2: capacity and financial calculations on SMT2020 data. Scenarios and interactive inputs come later.</p>
+  <p class="notice">Phases 1 and 2: capacity and financial calculations on SMT2020 data. Module 3: scenario comparisons (in progress). Interactive inputs come later.</p>
 
   <main>
     <!-- Results -->
@@ -49,6 +50,14 @@
       </div>
     </section>
 
+    <!-- Scenarios (Module 3) -->
+    <section id="page-scenarios" class="page" hidden>
+      <p id="scenario-answer" class="answer"></p>
+      <div id="scenario-cards" class="scenarios"></div>
+      <p id="scenario-missing" class="missing-banner"></p>
+      <p class="muted">Each scenario reruns the whole calculation, from arrival rate to wait. The current state is the validated hand calculation. Cost of the wait is holding cost only (L<sub>q</sub> × cost per lot-hour × 8,760 h a year); see the Costs page for the assumptions.</p>
+    </section>
+
     <!-- Costs -->
     <section id="page-costs" class="page" hidden>
       <p id="cost-answer" class="answer"></p>
@@ -66,7 +75,7 @@
 
       <div class="panel">
         <h2>Cost assumptions</h2>
-        <p class="muted">From the Litho Rework Cost Assumptions doc; numbers in brackets are its sources. The stepper and project costs are used for payback and ROI once scenarios are added. Edit them in <code>js/app.js</code>.</p>
+        <p class="muted">From the Litho Rework Cost Assumptions doc; numbers in brackets are its sources. The stepper and project costs are used for payback on the Scenarios page. Edit them in <code>js/app.js</code>.</p>
         <div id="cost-assumptions" class="scroll"></div>
         <p class="muted limits">The cost of waiting here is holding cost only. Waiting also delays revenue and can lower yield, and at a bottleneck the bigger cost is lost output, which this figure doesn’t include.</p>
       </div>

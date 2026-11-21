@@ -7,10 +7,10 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=10">
-  <script src="js/calc.js?v=10" defer></script>
-  <script src="js/tests.js?v=10" defer></script>
-  <script src="js/app.js?v=10" defer></script>
+  <link rel="stylesheet" href="style.css?v=11">
+  <script src="js/calc.js?v=11" defer></script>
+  <script src="js/tests.js?v=11" defer></script>
+  <script src="js/app.js?v=11" defer></script>
 </head>
 <body>
   <header class="top">
@@ -22,7 +22,7 @@
 
   <nav class="tabs" aria-label="Pages">
     <div class="tabs-inner">
-      <a href="#results" data-page="results">Results</a>
+      <a href="#explore" data-page="explore">Explore</a>
       <a href="#scenarios" data-page="scenarios">Scenarios</a>
       <a href="#costs" data-page="costs">Costs</a>
       <a href="#data" data-page="data">Data</a>
@@ -30,22 +30,78 @@
     </div>
   </nav>
 
-  <p class="notice">Phases 1 and 2: capacity and financial calculations on SMT2020 data. Module 3: scenario comparisons (in progress). Interactive inputs come later.</p>
+  <p class="notice">Phases 1 and 2: capacity and financial calculations on SMT2020 data. Module 3: scenario comparisons and Module 4: interactive inputs (in progress).</p>
 
   <main>
-    <!-- Results -->
-    <section id="page-results" class="page">
-      <p id="answer" class="answer"></p>
-      <dl id="readout" class="readout"></dl>
-      <div class="pair">
-        <div class="panel">
-          <h2>Wait climbs steeply as the steppers fill up</h2>
-          <div id="curve" class="chart"></div>
-          <p class="muted">The curve holds everything else fixed and changes only the load. Near 100% busy, a small rise in load causes a large jump in wait.</p>
-        </div>
-        <div class="panel">
-          <h2>How the wait is calculated</h2>
-          <ol id="route" class="route"></ol>
+    <!-- Explore (Module 4): sliders on the left, results that update on the right -->
+    <section id="page-explore" class="page">
+      <div class="explore">
+        <aside class="panel controls" aria-label="Inputs">
+          <h2>Try different values</h2>
+          <p class="muted">Results update as you move a slider.</p>
+
+          <div class="field">
+            <div class="field-head"><label for="in-rework">Rework rate</label><output id="out-rework" for="in-rework"></output></div>
+            <input type="range" id="in-rework" data-key="reworkProb" min="0.005" max="0.02" step="0.001">
+            <p class="hint" id="hint-rework"></p>
+          </div>
+          <div class="field">
+            <div class="field-head"><label for="in-m">Number of steppers</label><output id="out-m" for="in-m"></output></div>
+            <input type="range" id="in-m" data-key="m" min="1" max="8" step="1">
+            <p class="hint" id="hint-m"></p>
+          </div>
+          <div class="field">
+            <div class="field-head"><label for="in-A">Availability</label><output id="out-A" for="in-A"></output></div>
+            <input type="range" id="in-A" data-key="availability" min="0.7" max="0.99" step="0.001">
+            <p class="hint" id="hint-A"></p>
+          </div>
+          <div class="field">
+            <div class="field-head"><label for="in-ca">Arrival variability c<sub>a</sub>²</label><output id="out-ca" for="in-ca"></output></div>
+            <input type="range" id="in-ca" data-key="caSq" min="0" max="3" step="0.05">
+            <p class="hint" id="hint-ca"></p>
+          </div>
+
+          <h3 class="controls-sub">Costs</h3>
+          <div class="field">
+            <label for="in-wait">Cost of waiting <span class="unit">$ per lot-hour</span></label>
+            <input type="number" id="in-wait" data-key="waitCost" min="0" step="any" inputmode="decimal">
+            <p class="hint" id="hint-wait"></p>
+          </div>
+          <div class="field">
+            <label for="in-stepper">Cost of an extra stepper <span class="unit">$</span></label>
+            <input type="number" id="in-stepper" data-key="stepperCost" min="0" step="any" inputmode="decimal">
+            <p class="hint" id="hint-stepper"></p>
+          </div>
+          <div class="field">
+            <label for="in-project">Cost of the rework project <span class="unit">$</span></label>
+            <input type="number" id="in-project" data-key="projectCost" min="0" step="any" inputmode="decimal">
+            <p class="hint" id="hint-project"></p>
+          </div>
+
+          <button type="button" id="reset" class="button">Reset to the data</button>
+        </aside>
+
+        <div class="results">
+          <p id="answer" class="answer" aria-live="polite"></p>
+          <dl id="readout" class="readout"></dl>
+
+          <div class="panel">
+            <h2>Wait climbs steeply as the steppers fill up</h2>
+            <div id="curve" class="chart"></div>
+            <p id="chart-legend" class="legend"></p>
+            <p class="muted">The curve holds everything else fixed and changes only the load. Near 100% busy, a small rise in load causes a large jump in wait.</p>
+          </div>
+
+          <div class="pair">
+            <div class="panel">
+              <h2>Payback at these settings</h2>
+              <div id="paybacks"></div>
+            </div>
+            <div class="panel">
+              <h2>How the wait is calculated</h2>
+              <ol id="route" class="route"></ol>
+            </div>
+          </div>
         </div>
       </div>
     </section>
@@ -55,7 +111,7 @@
       <p id="scenario-answer" class="answer"></p>
       <div id="scenario-cards" class="scenarios"></div>
       <p id="scenario-missing" class="missing-banner"></p>
-      <p class="muted">Each scenario reruns the whole calculation, from arrival rate to wait. The current state is the validated hand calculation. Cost of the wait is holding cost only (L<sub>q</sub> × cost per lot-hour × 8,760 h a year); see the Costs page for the assumptions.</p>
+      <p class="muted">Each scenario reruns the whole calculation, from arrival rate to wait. The current state is the validated hand calculation, so this page doesn’t follow the sliders on Explore. Cost of the wait is holding cost only (L<sub>q</sub> × cost per lot-hour × 8,760 h a year); see the Costs page for the assumptions.</p>
     </section>
 
     <!-- Costs -->

@@ -1,6 +1,7 @@
 /*
   calc.js — Phase 1: capacity calculations for one lithography tool group (G/G/m).
             Phase 2: financial calculations (delay cost, payback, ROI).
+            Module 3: scenarios (current state, add a stepper, cut the rework rate).
   Every time is in MINUTES (to match the hand-calc). Rates are per minute.
   Percentages are decimals (1.7% = 0.017). Hour conversions are returned at the end.
   Formulas match the Calculations doc for Litho_FE_98 (SMT2020).
@@ -208,11 +209,30 @@ const Calc = (() => {
   }
 
   // ---- Phase 2: financial calculations ----
-  // fixEconomics and breakEvenWaitCost compare a "before" and an "after" result;
-  // the scenarios that produce those results come in a later module.
+  // fixEconomics and breakEvenWaitCost compare a "before" and an "after" result (Module 3 scenarios).
+
+  // Returns a copy of the inputs with scenario settings applied; the original is never changed.
+  //   m           number of tools
+  //   reworkProb  replaces the rework probability on every step that has a rework loop
+  //               (a step with reworkProb set; in the Litho_FE_98 data, Product 3 Step 65, 072_Litho)
+  function applyWhatIf(inputs, whatIf = {}) {
+    const out = { ...inputs, steps: inputs.steps.map(s => ({ ...s })) };
+    if (whatIf.m != null) out.m = whatIf.m;
+    if (whatIf.reworkProb != null) {
+      out.steps.forEach(s => { if (s.reworkProb != null) s.reworkProb = whatIf.reworkProb; });
+    }
+    return out;
+  }
+
+  // Module 3: reruns the whole queueing chain for each scenario (Detailed Calculations,
+  // "Improvement scenarios and savings": rerun everything, not just the last formula).
+  function runScenarios(inputs, scenarios) {
+    return scenarios.map(sc => ({ ...sc, result: run(applyWhatIf(inputs, sc.whatIf || {})) }));
+  }
 
   // The SMT2020 fab runs around the clock, so a week is 168 hours.
   const HOURS_PER_WEEK = 168;
+  const HOURS_PER_YEAR = 8760;   // H in the Detailed Calculations: 365 x 24
 
   // Weekly cost of waiting: average lots waiting (Lq) x hours per week x $ per lot-hour.
   // null when the cost isn't entered yet; Infinity when the queue is unstable.
@@ -222,38 +242,45 @@ const Calc = (() => {
     return result.Lq * HOURS_PER_WEEK * costPerLotHour;
   }
 
+  // Yearly cost of waiting: C_waiting,year = Lq x h x H (Detailed Calculations).
+  function annualWaitCost(result, costPerLotHour) {
+    if (costPerLotHour == null) return null;
+    if (!result.stable) return Infinity;
+    return result.Lq * costPerLotHour * HOURS_PER_YEAR;
+  }
+
   // Holding (carrying) cost of one lot per hour of waiting:
   // wafers per lot x wafer cost x annual carrying rate / 8,760 hours per year.
   function carryingCostPerLotHour(wafersPerLot, waferCost, carryingRate) {
     return wafersPerLot * waferCost * carryingRate / 8760;
   }
 
-  // Compares a fix with the current state.
-  //   weeklySavings = weekly waiting cost before - after
-  //   paybackWeeks  = cost of the fix / weekly savings
-  //   roi           = (weekly savings x horizonWeeks - cost of the fix) / cost of the fix
+  // Compares a fix with the current state, on a yearly basis (Detailed Calculations):
+  //   annualSavings = C_baseline - C_improved - yearly operating cost of the fix (if known)
+  //   paybackYears  = I / annual net savings
+  //   roi           = (annual net savings x horizonYears - I) / I
   // status says why a value is missing: "current-unstable", "fix-unstable", "no-wait-cost", "no-fix-cost".
-  function fixEconomics(current, fixed, fixCost, costPerLotHour, horizonWeeks = 52) {
-    const out = { status: "ok", before: null, after: null, weeklySavings: null, paybackWeeks: null, roi: null };
+  function fixEconomics(current, fixed, fixCost, costPerLotHour, horizonYears = 5, annualOperatingCost = 0) {
+    const out = { status: "ok", before: null, after: null, annualSavings: null, paybackYears: null, roi: null };
     if (!current.stable) { out.status = "current-unstable"; return out; }
     if (!fixed.stable) { out.status = "fix-unstable"; return out; }
     if (costPerLotHour == null) { out.status = "no-wait-cost"; return out; }
-    out.before = weeklyWaitCost(current, costPerLotHour);
-    out.after = weeklyWaitCost(fixed, costPerLotHour);
-    out.weeklySavings = out.before - out.after;
+    out.before = annualWaitCost(current, costPerLotHour);
+    out.after = annualWaitCost(fixed, costPerLotHour);
+    out.annualSavings = out.before - out.after - (annualOperatingCost || 0);
     if (fixCost == null) { out.status = "no-fix-cost"; return out; }
-    out.paybackWeeks = out.weeklySavings > 0 ? fixCost / out.weeklySavings : Infinity;
-    out.roi = fixCost > 0 ? (out.weeklySavings * horizonWeeks - fixCost) / fixCost : null;
+    out.paybackYears = out.annualSavings > 0 ? fixCost / out.annualSavings : Infinity;
+    out.roi = fixCost > 0 ? (out.annualSavings * horizonYears - fixCost) / fixCost : null;
     return out;
   }
 
-  // Break-even cost of waiting: the $ per lot-hour at which a fix pays for itself in exactly horizonWeeks.
-  //   = cost of the fix / (drop in Lq x 168 h x horizonWeeks). null if it can't be worked out.
-  function breakEvenWaitCost(current, fixed, fixCost, horizonWeeks) {
+  // Break-even cost of waiting: the $ per lot-hour at which a fix pays for itself in exactly horizonYears.
+  //   = cost of the fix / (drop in Lq x 8,760 h x horizonYears). null if it can't be worked out.
+  function breakEvenWaitCost(current, fixed, fixCost, horizonYears) {
     if (!current.stable || !fixed.stable || fixCost == null) return null;
     const dropLq = current.Lq - fixed.Lq;
     if (!(dropLq > 0)) return null;
-    return fixCost / (dropLq * HOURS_PER_WEEK * horizonWeeks);
+    return fixCost / (dropLq * HOURS_PER_YEAR * horizonYears);
   }
 
   // Litho_FE_98 inputs from the Dataset and Calculations docs (SMT2020). All times in minutes.
@@ -292,7 +319,8 @@ const Calc = (() => {
   return {
     productReleaseRate, arrivalRates, lotTime, jobMix, stepSummary, downtimeScv,
     effectiveTime, utilization, sakasegawaWq, validate, run,
-    HOURS_PER_WEEK, carryingCostPerLotHour, weeklyWaitCost, fixEconomics,
+    applyWhatIf, runScenarios, HOURS_PER_WEEK, HOURS_PER_YEAR, carryingCostPerLotHour,
+    weeklyWaitCost, annualWaitCost, fixEconomics,
     breakEvenWaitCost, LITHO_FE_98,
   };
 })();

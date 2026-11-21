@@ -166,7 +166,28 @@ a { color: var(--ink); font-weight: 600; }
 .limits { margin: 0.75rem 0 0; }
 #cost-assumptions td.src { min-width: 22rem; }
 
+/* ---------- Scenarios ---------- */
+.scenarios { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1.25rem; align-items: start; }
+.scenario { position: relative; background: var(--panel); border: 1px solid var(--rule); border-top: 6px solid var(--teal); border-radius: var(--radius); padding: 1.1rem 1.25rem 1.25rem; }
+.scenario.best { border: 2px solid var(--teal); border-top: 6px solid var(--gold); }
+.scenario.pending { border-style: dashed; border-top: 6px solid var(--rule-mid); background: transparent; }
+.scenario h3 { margin: 0; font-size: 1.25rem; color: var(--teal); }
+.scenario .change { margin: 0.15rem 0 0.75rem; color: var(--ink-soft); font-weight: 600; }
+.scenario dl { margin: 0; }
+.scenario dl div { display: flex; justify-content: space-between; gap: 1rem; padding: 0.45rem 0; border-bottom: 1px solid var(--rule); }
+.scenario dl div:last-child { border-bottom: 0; }
+.scenario dt { color: var(--ink-soft); }
+.scenario dd { margin: 0; font-weight: 800; text-align: right; white-space: nowrap; }
+.scenario .worked { margin: 0.75rem 0 0; padding-top: 0.6rem; border-top: 2px solid var(--rule); font-size: 0.85rem; color: var(--ink-soft); line-height: 1.45; }
+.pending-note { margin: 0.5rem 0 0; color: var(--ink-soft); }
+.badge { position: absolute; top: -0.85rem; right: 1rem; margin: 0; padding: 0.1rem 0.6rem; font-size: 0.85rem; font-weight: 800; background: var(--teal); color: var(--panel); border-radius: 999px; }
+.missing-banner:empty { display: none; }
+.missing-banner { margin: 0; padding: 0.75rem 1rem; background: var(--red-tint); border-left: 5px solid var(--red); border-radius: 4px; }
+
 /* ---------- Narrow screens ---------- */
+@media (max-width: 64rem) {
+  .scenarios { grid-template-columns: 1fr; }
+}
 @media (max-width: 40rem) {
   #readout { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }

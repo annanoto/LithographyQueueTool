@@ -1,6 +1,6 @@
 /*
   app.js — holds the inputs, runs the capacity (Phase 1) and financial (Phase 2) calculations,
-  and shows the results (pages: Results, Costs, Data, Check against hand calc).
+  and shows the results (pages: Results, Scenarios, Costs, Data, Check against hand calc).
   All times in MINUTES, rates and percentages as decimals (1.7% = 0.017).
   calc.js works in minutes (to match the hand-calc); the readout and chart convert waits to hours.
 
@@ -64,20 +64,32 @@ const inputs = {
         low:  { waferCost: 3000,  carryingRate: 0.20 },  // 28nm, 20%  -> $1.71
         high: { waferCost: 17000, carryingRate: 0.30 },  // advanced-node wafer [8], 30% -> $14.55
       },
-      source: "Derived: 25 wafers × wafer cost ($3,000 at 28nm [7]; $17,000 advanced [8]) × 20–30% carrying rate [9], [10] ÷ 8,760 h",
+      source: "Baseline $2.14 chosen by Isabella: 25 wafers × $3,000 (28nm [7]) × 25% carrying rate [9], [10] ÷ 8,760 h. Range uses $3,000–$17,000 wafers [7], [8] and 20–30% carrying.",
     },
-    // The next two are used for payback and ROI once scenarios are added (later module).
+    // Baselines chosen by Isabella (cost baselines and reasoning, Nov 2026).
     extraStepper: {
       label: "Cost of an extra stepper", unit: "$ per tool",
-      value: 14e6, low: 7e6, high: 34e6,  // KrF; i-line; dry ArF [1]. Tool speed fits these older classes.
-      source: "Industry estimates [1]: i-line ~$7M, KrF ~$14M, dry ArF ~$34M. Excludes installation and qualification.",
+      value: 34e6, low: 7e6, high: 34e6,  // dry ArF [1]; range i-line to dry ArF
+      annualOperatingCost: null,         // MISSING: yearly running/maintenance cost of a 6th tool, if any
+      source: "Dry ArF ~$34M [1]: chosen by Isabella as the most verified and relevant cost. Range: i-line ~$7M to dry ArF ~$34M [1]. Excludes installation and qualification.",
     },
     reworkProject: {
       label: "Cost of a rework-reduction project", unit: "$ per project",
-      value: 62500, low: 50000, high: 75000,  // Six Sigma worked examples [13]; $2–5M if a new resist is needed [17]
-      source: "Illustrative Six Sigma examples, $50K–$75K [13]. A new resist would cost $2M–$5M [17].",
+      value: 75000, low: 50000, high: 75000,  // Six Sigma worked examples [13]
+      annualOperatingCost: null,             // MISSING: yearly cost to keep the improvement running, if any
+      source: "$75,000 one-time: chosen by Isabella as the most supported value found ($50K–$75K examples [13]). A new resist would cost $2M–$5M [17].",
     },
   },
+
+  // Module 3 scenarios.
+  scenarios: {
+    addSteppers: 1,             // 5 tools -> 6
+    reworkTarget: {             // MISSING: Peixuan's target rework rate for 072_Litho (Product 3 Step 65), as a decimal
+      value: null,
+      source: "",
+    },
+  },
+
 };
 
 /* ---------- Derived cost values ---------- */
@@ -97,7 +109,7 @@ const hfmt = min => Number.isFinite(min) ? fmt(hrs(min), 3) : "∞";
 const $ = id => document.getElementById(id);
 const moneyFmt = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 });
 const money = x => x == null ? "—" : !Number.isFinite(x) ? "∞" : Math.abs(x) < 100 ? `$${x.toFixed(2)}` : moneyFmt.format(x);
-const PAGES = ["results", "costs", "data", "check"];
+const PAGES = ["results", "scenarios", "costs", "data", "check"];
 let base = null;
 
 /* ---------- Hand calculation (Calculations doc, Litho_FE_98) ---------- */
@@ -261,6 +273,11 @@ function placeholderItems() {
     }
   }
   for (const c of Object.values(inputs.costs || {})) items.push([`${c.label} (base)`, c.value, c.unit, c.source]);
+  items.push(["Target rework rate for 072_Litho (Peixuan)", inputs.scenarios.reworkTarget.value, "decimal", inputs.scenarios.reworkTarget.source]);
+  items.push(["Yearly operating cost of the extra stepper", inputs.costs.extraStepper.annualOperatingCost, "$ per year",
+    inputs.costs.extraStepper.annualOperatingCost != null ? "Team" : ""]);
+  items.push(["Yearly operating cost of the rework project", inputs.costs.reworkProject.annualOperatingCost, "$ per year",
+    inputs.costs.reworkProject.annualOperatingCost != null ? "Team" : ""]);
   return items;
 }
 
@@ -310,7 +327,7 @@ function renderCosts() {
   const weekly = Calc.weeklyWaitCost(r, wait.value);
 
   $("cost-answer").innerHTML = r.stable
-    ? `On average about <strong>${fmt(r.Lq, 3)} lots</strong> are waiting at ${inputs.toolGroup}. At ${money(wait.value)} per lot-hour, that waiting costs about <strong>${money(weekly)} a week</strong> (${money(weekly * 52)} a year) in holding cost.`
+    ? `On average about <strong>${fmt(r.Lq, 3)} lots</strong> are waiting at ${inputs.toolGroup}. At ${money(wait.value)} per lot-hour, that waiting costs about <strong>${money(weekly)} a week</strong> (${money(Calc.annualWaitCost(r, wait.value))} a year) in holding cost.`
     : `The steppers are over capacity, so the queue and its cost grow without limit.`;
 
   $("cost-worked").innerHTML = r.stable ? `
@@ -321,6 +338,8 @@ function renderCosts() {
         <code>25 wafers × ${money(wait.parts.base.waferCost)} × ${pct(wait.parts.base.carryingRate, 2)} ÷ 8,760 h = ${money(wait.value)}</code></li>
       <li><span>Weekly delay cost</span>
         <code>${fmt(r.Lq, 6)} lots × ${HPW} h × ${money(wait.value)} = ${money(weekly)}</code></li>
+      <li><span>Yearly delay cost</span>
+        <code>${fmt(r.Lq, 6)} lots × ${money(wait.value)} × ${Calc.HOURS_PER_YEAR.toLocaleString("en-US")} h = ${money(Calc.annualWaitCost(r, wait.value))}</code></li>
     </ol>` : "";
 
   const cases = [
@@ -335,7 +354,7 @@ function renderCosts() {
       <thead><tr><th>Cost of waiting</th><th class="num">$ per lot-hour</th><th class="num">Weekly delay cost</th><th class="num">Yearly delay cost</th></tr></thead>
       <tbody>${cases.map(([label, c]) => {
         const w = Calc.weeklyWaitCost(r, c);
-        return `<tr><td>${label}</td><td class="num">${money(c)}</td><td class="num">${money(w)}</td><td class="num">${money(w * 52)}</td></tr>`;
+        return `<tr><td>${label}</td><td class="num">${money(c)}</td><td class="num">${money(w)}</td><td class="num">${money(Calc.annualWaitCost(r, c))}</td></tr>`;
       }).join("")}</tbody>
     </table>`;
 
@@ -347,10 +366,95 @@ function renderCosts() {
       <tbody>
         ${[c.waitingPerLotHour, c.extraStepper, c.reworkProject].map(x =>
           `<tr><td>${x.label} <span class="muted">(${x.unit})</span></td><td class="num">${money(x.value)}</td><td class="num">${rangeTxt(x)}</td><td class="src">${x.source}</td></tr>`).join("")}
-        <tr><td>Hours per week</td><td class="num">${HPW}</td><td class="num">—</td><td class="src">The SMT2020 fab runs around the clock.</td></tr>
+        <tr><td>Hours per week / year</td><td class="num">${HPW} / ${Calc.HOURS_PER_YEAR.toLocaleString("en-US")}</td><td class="num">—</td><td class="src">The SMT2020 fab runs around the clock (H = 365 × 24 in the Detailed Calculations).</td></tr>
       </tbody>
     </table>`;
 }
+
+/* ---------- Scenarios (Module 3) ---------- */
+const reworkStep = inputs.steps.find(s => s.reworkProb != null);
+const yearsFmt = y => y == null ? "—" : !Number.isFinite(y) ? "Never" : y < 1 ? `${fmt(y * 12, 3)} months` : `${fmt(y, 3)} years`;
+
+function renderScenarios() {
+  const wait = inputs.costs.waitingPerLotHour;
+  const target = inputs.scenarios.reworkTarget.value;
+  const mNew = inputs.m + inputs.scenarios.addSteppers;
+  const stepName = reworkStep ? `${reworkStep.name}` : "the rework step";
+  const fromRate = reworkStep ? reworkStep.reworkProb : 0;
+
+  // Current state = the validated hand-calc run. Each fix reruns the whole chain.
+  const list = [
+    { key: "current", title: "Current state", change: `${inputs.m} steppers, ${pct(fromRate, 2)} rework at ${stepName}`, whatIf: {} },
+    { key: "add", title: "Add a stepper", change: `${inputs.m} → ${mNew} steppers`, whatIf: { m: mNew }, cost: inputs.costs.extraStepper },
+  ];
+  if (target != null) list.push({ key: "cut", title: "Cut the rework rate", change: `${stepName}: ${pct(fromRate, 2)} → ${pct(target, 2)}`,
+    whatIf: { reworkProb: target }, cost: inputs.costs.reworkProject });
+  const runs = Calc.runScenarios(inputs, list);
+  const cur = runs[0].result;
+
+  const card = sc => {
+    const r = sc.result;
+    const yearly = Calc.annualWaitCost(r, wait.value);
+    const rows = [
+      ["Utilization", pct(r.rho)],
+      ["Wait in queue", `${hfmt(r.Wq)} h`],
+      ["Lots waiting (L<sub>q</sub>)", fmt(r.Lq, 4)],
+      ["Cost of the wait, per year", money(yearly)],
+    ];
+    let worked = `Cost of the wait = L<sub>q</sub> ${fmt(r.Lq, 4)} × ${money(wait.value)} × ${Calc.HOURS_PER_YEAR.toLocaleString("en-US")} h`;
+    if (sc.cost) {
+      const op = sc.cost.annualOperatingCost;
+      const e = Calc.fixEconomics(cur, r, sc.cost.value, wait.value, 5, op || 0);
+      sc.econ = e;
+      rows.push(
+        ["Savings per year", money(e.annualSavings)],
+        ["Cost of fix (one-time)", money(sc.cost.value)],
+        [op == null ? "Payback (before operating costs)" : "Payback", yearsFmt(e.paybackYears)],
+      );
+      if (e.status === "ok") worked += `<br>Payback = ${money(sc.cost.value)} ÷ ${money(e.annualSavings)} per year`;
+    }
+    return { ...sc, rows, worked };
+  };
+  const cards = runs.map(card);
+
+  if (target == null) cards.push({ key: "cut", title: "Cut the rework rate", change: `${stepName}: ${pct(fromRate, 2)} → target not set`, pending: true });
+
+  const fixes = cards.filter(c => c.econ && c.econ.status === "ok");
+  const best = fixes.length === 2 ? fixes.reduce((a, b) => (a.econ.paybackYears <= b.econ.paybackYears ? a : b)).key : null;
+
+  $("scenario-cards").innerHTML = cards.map(sc => sc.pending ? `
+    <article class="scenario pending">
+      <h3>${sc.title}</h3><p class="change">${sc.change}</p>
+      <p class="pending-note">Waiting on Peixuan’s target rework rate for ${stepName}. Once it is entered in <code>js/app.js</code>, this column fills in.</p>
+    </article>` : `
+    <article class="scenario${best === sc.key ? " best" : ""}">
+      ${best === sc.key ? `<p class="badge">Pays back sooner</p>` : ""}
+      <h3>${sc.title}</h3><p class="change">${sc.change}</p>
+      <dl>${sc.rows.map(([k, v]) => `<div><dt>${k}</dt><dd>${v}</dd></div>`).join("")}</dl>
+      <p class="worked">${sc.worked}</p>
+    </article>`).join("");
+
+  const add = cards.find(c => c.key === "add"), cut = cards.find(c => c.key === "cut");
+  let answer = "";
+  if (add.econ?.status === "ok") {
+    answer = `Adding a ${ordinal(mNew)} stepper cuts the wait from <strong>${hfmt(cur.Wq)} to ${hfmt(add.result.Wq)} hours</strong> and saves ${money(add.econ.annualSavings)} a year in holding cost, so its ${money(add.cost.value)} price pays back in <strong>${yearsFmt(add.econ.paybackYears)}</strong>.`;
+  }
+  if (cut && !cut.pending && cut.econ?.status === "ok") {
+    answer += ` Cutting rework to ${pct(target, 2)} cuts the wait to ${hfmt(cut.result.Wq)} hours and pays back in <strong>${yearsFmt(cut.econ.paybackYears)}</strong>.`;
+  } else if (cut?.pending) {
+    answer += ` The rework scenario is waiting on Peixuan’s target rate.`;
+  }
+  $("scenario-answer").innerHTML = answer;
+
+  const missing = [];
+  if (target == null) missing.push(`Peixuan’s target rework rate for ${stepName}`);
+  if (inputs.costs.extraStepper.annualOperatingCost == null) missing.push("the yearly operating cost of a sixth stepper");
+  if (inputs.costs.reworkProject.annualOperatingCost == null) missing.push("any yearly cost of keeping the rework improvement running");
+  $("scenario-missing").innerHTML = missing.length
+    ? `<strong>Still needed:</strong> ${missing.join("; ")}. Payback uses holding-cost savings only, before operating costs, until those are entered.`
+    : "";
+}
+const ordinal = n => n + (["th", "st", "nd", "rd"][((n % 100) - 20) % 10] || ["th", "st", "nd", "rd"][n % 100] || "th");
 
 /* ---------- Check against the hand calculation ---------- */
 function renderCheck() {
@@ -405,6 +509,7 @@ document.addEventListener("DOMContentLoaded", () => {
   renderData();
   renderCheck();
   renderCosts();
+  renderScenarios();
   showPage();
   renderResults();
   if (typeof runSelfChecks === "function") runSelfChecks();

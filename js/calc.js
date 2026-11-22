@@ -20,7 +20,8 @@ const Calc = (() => {
   // A job class is one step x one lot type, because lot types can differ in wafers per lot
   // (and so in lot processing time). With equal wafers per lot this gives the same answer as per-step.
   // A step that rework returns to (probability r on every visit) is visited 1/(1 - r) times per lot
-  // (geometric series 1 + r + r^2 + ...). No division by m here; that happens in utilization.
+  // (geometric series 1 + r + r^2 + ...). Confirmed by Peixuan: SMT2020 sets no limit on rework cycles,
+  // so a reworked lot can be reworked again (a single-rework cap would be 1 + r instead). No division by m here; that happens in utilization.
   function arrivalRates(steps, products) {
     return steps.flatMap(s => {
       const r = s.reworkProb ?? 0;

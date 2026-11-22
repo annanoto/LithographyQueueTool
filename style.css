@@ -35,10 +35,9 @@ body {
   line-height: 1.5;
   font-variant-numeric: tabular-nums;
 }
-.notice { margin-top: 1rem; margin-bottom: 0; font-size: 0.95rem; color: var(--ink-soft); }
 :focus-visible { outline: 3px solid var(--gold); outline-offset: 2px; }
 
-.top, .notice, main, footer { max-width: 78rem; margin-inline: auto; padding-inline: clamp(1rem, 3vw, 2rem); }
+.top, main, footer { max-width: 78rem; margin-inline: auto; padding-inline: clamp(1rem, 3vw, 2rem); }
 
 /* Header */
 .top { display: flex; justify-content: space-between; align-items: flex-end; gap: 1.5rem; padding-top: 2rem; padding-bottom: 1.5rem; color: var(--bg); background: var(--teal);

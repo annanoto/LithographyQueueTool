@@ -227,6 +227,9 @@ input[aria-invalid] { border-color: var(--red); }
 .scenario .worked { margin: 0.75rem 0 0; padding-top: 0.6rem; border-top: 2px solid var(--rule); font-size: 0.85rem; color: var(--ink-soft); line-height: 1.45; }
 .pending-note { margin: 0.5rem 0 0; color: var(--ink-soft); }
 .badge { position: absolute; top: -0.85rem; right: 1rem; margin: 0; padding: 0.1rem 0.6rem; font-size: 0.85rem; font-weight: 800; background: var(--teal); color: var(--panel); border-radius: 999px; }
+.settings-note { margin: 0; padding: 0.65rem 1rem; background: var(--panel); border: 1px solid var(--rule); border-left: 5px solid var(--sage); border-radius: 4px; }
+.settings-note.changed { border-left-color: var(--gold); }
+.scenario .reason { font-weight: 600; color: var(--ink-soft); white-space: normal; }
 .missing-banner:empty { display: none; }
 .missing-banner { margin: 0; padding: 0.75rem 1rem; background: var(--red-tint); border-left: 5px solid var(--red); border-radius: 4px; }
 

@@ -7,10 +7,10 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=12">
-  <script src="js/calc.js?v=12" defer></script>
-  <script src="js/tests.js?v=12" defer></script>
-  <script src="js/app.js?v=12" defer></script>
+  <link rel="stylesheet" href="style.css?v=13">
+  <script src="js/calc.js?v=13" defer></script>
+  <script src="js/tests.js?v=13" defer></script>
+  <script src="js/app.js?v=13" defer></script>
 </head>
 <body>
   <header class="top">
@@ -109,10 +109,11 @@
 
     <!-- Scenarios (Module 3) -->
     <section id="page-scenarios" class="page" hidden>
-      <p id="scenario-answer" class="answer"></p>
+      <p id="scenario-settings" class="settings-note"></p>
+      <p id="scenario-answer" class="answer" aria-live="polite"></p>
       <div id="scenario-cards" class="scenarios"></div>
       <p id="scenario-missing" class="missing-banner"></p>
-      <p class="muted">Each scenario reruns the whole calculation, from arrival rate to wait. The current state is the validated hand calculation, so this page doesn’t follow the sliders on Explore. Cost of the wait is holding cost only (L<sub>q</sub> × cost per lot-hour × 8,760 h a year); see the Costs page for the assumptions.</p>
+      <p class="muted">Each scenario reruns the whole calculation, from arrival rate to wait. The scenarios start from the settings on Explore; at the data as given, the current state is the validated hand calculation. Cost of the wait is holding cost only (L<sub>q</sub> × cost per lot-hour × 8,760 h a year); see the Costs page for the assumptions.</p>
     </section>
 
     <!-- Costs -->

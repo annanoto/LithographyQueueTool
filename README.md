@@ -1,4 +1,4 @@
-# Lithography queue tool
+# Lithography Queue & Payback Tool
 
 IE6300, Fall 2026, Northeastern University, Group 7. Created by Anna Noto.
 

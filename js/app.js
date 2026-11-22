@@ -110,7 +110,8 @@ const hfmt = min => Number.isFinite(min) ? fmt(hrs(min), 3) : "∞";
 const $ = id => document.getElementById(id);
 const moneyFmt = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 });
 const money = x => x == null ? "—" : !Number.isFinite(x) ? "∞" : Math.abs(x) < 100 ? `$${x.toFixed(2)}` : moneyFmt.format(x);
-const yearsFmt = y => y == null ? "—" : !Number.isFinite(y) ? "Never" : y < 1 ? `${fmt(y * 12, 3)} months` : `${fmt(y, 3)} years`;
+const yearsFmt = y => y == null ? "—" : !Number.isFinite(y) ? "Never"
+  : y < 1 / 12 ? `${fmt(y * 52.14, 2)} weeks` : y < 1 ? `${fmt(y * 12, 3)} months` : `${fmt(y, 3)} years`;
 const ordinal = n => n + (["th", "st", "nd", "rd"][((n % 100) - 20) % 10] || ["th", "st", "nd", "rd"][n % 100] || "th");
 const reworkStep = inputs.steps.find(s => s.reworkProb != null);
 const PAGES = ["explore", "scenarios", "costs", "data", "check"];
@@ -355,7 +356,7 @@ function onInput(e) {
 }
 
 function safeRenderExplore() {
-  try { renderExplore(); }
+  try { renderExplore(); renderScenarios(); }
   catch (err) { $("answer").innerHTML = `<span class="warn-text">These settings can’t be calculated:</span> ${err.message}`; }
 }
 
@@ -479,52 +480,56 @@ function renderCosts() {
 
 /* ---------- Scenarios (Module 3) ---------- */
 
+// Scenarios start from the Explore settings (sliders and cost boxes). At the defaults, the
+// current state is the validated hand calculation.
 function renderScenarios() {
-  const wait = inputs.costs.waitingPerLotHour;
   const target = inputs.scenarios.reworkTarget.value;
-  const mNew = inputs.m + inputs.scenarios.addSteppers;
+  const mNew = state.m + inputs.scenarios.addSteppers;
   const stepName = reworkStep ? `${reworkStep.name}` : "the rework step";
-  const fromRate = reworkStep ? reworkStep.reworkProb : 0;
+  const fromRate = state.reworkProb;
+  const atTarget = target != null && fromRate <= target + 1e-12;
 
-  // Current state = the validated hand-calc run. Each fix reruns the whole chain.
   const list = [
-    { key: "current", title: "Current state", change: `${inputs.m} steppers, ${pct(fromRate, 2)} rework at ${stepName}`, whatIf: {} },
-    { key: "add", title: "Add a stepper", change: `${inputs.m} → ${mNew} steppers`, whatIf: { m: mNew }, cost: inputs.costs.extraStepper },
+    { key: "current", title: "Current state", change: `${state.m} steppers, ${pct(fromRate, 2)} rework at ${stepName}`, whatIf: sliderSettings() },
+    { key: "add", title: "Add a stepper", change: `${state.m} → ${mNew} steppers, rework stays at ${pct(fromRate, 2)}`,
+      whatIf: sliderSettings({ m: mNew }), cost: state.stepperCost, op: inputs.costs.extraStepper.annualOperatingCost },
   ];
-  if (target != null) list.push({ key: "cut", title: "Cut the rework rate", change: `${stepName}: ${pct(fromRate, 2)} → ${pct(target, 2)}`,
-    whatIf: { reworkProb: target }, cost: inputs.costs.reworkProject });
+  if (target != null) list.push({ key: "cut", title: "Cut the rework rate", change: `${stepName}: ${pct(fromRate, 2)} → ${pct(target, 2)}, ${state.m} steppers`,
+    whatIf: sliderSettings({ reworkProb: target }), cost: state.projectCost, op: inputs.costs.reworkProject.annualOperatingCost });
   const runs = Calc.runScenarios(inputs, list);
   const cur = runs[0].result;
 
+  const why = { "current-unstable": "Current state is over capacity", "fix-unstable": "Still over capacity",
+    "no-wait-cost": "Enter the cost of waiting", "no-fix-cost": "Enter the cost of the fix", "at-target": "Already at the target" };
   const card = sc => {
     const r = sc.result;
-    const yearly = Calc.annualWaitCost(r, wait.value);
+    const yearly = Calc.annualWaitCost(r, state.waitCost);
     const rows = [
       ["Utilization", pct(r.rho)],
       ["Wait in queue", `${hfmt(r.Wq)} h`],
-      ["Lots waiting (L<sub>q</sub>)", fmt(r.Lq, 4)],
+      ["Lots waiting (L<sub>q</sub>)", r.stable ? fmt(r.Lq, 4) : "∞"],
       ["Cost of the wait, per year", money(yearly)],
     ];
-    let worked = `Cost of the wait = L<sub>q</sub> ${fmt(r.Lq, 4)} × ${money(wait.value)} × ${Calc.HOURS_PER_YEAR.toLocaleString("en-US")} h`;
-    if (sc.cost) {
-      const op = sc.cost.annualOperatingCost;
-      const e = Calc.fixEconomics(cur, r, sc.cost.value, wait.value, 5, op || 0);
+    let worked = r.stable && state.waitCost != null
+      ? `Cost of the wait = L<sub>q</sub> ${fmt(r.Lq, 4)} × ${money(state.waitCost)} × ${Calc.HOURS_PER_YEAR.toLocaleString("en-US")} h` : "";
+    if (sc.key !== "current") {
+      const e = (sc.key === "cut" && atTarget) ? { status: "at-target" } : Calc.fixEconomics(cur, r, sc.cost, state.waitCost, 5, sc.op || 0);
       sc.econ = e;
+      const paybackLabel = sc.op == null ? "Payback (before operating costs)" : "Payback";
       rows.push(
-        ["Savings per year", money(e.annualSavings)],
-        ["Cost of fix (one-time)", money(sc.cost.value)],
-        [op == null ? "Payback (before operating costs)" : "Payback", yearsFmt(e.paybackYears)],
+        ["Savings per year", e.status === "ok" ? money(e.annualSavings) : "—"],
+        ["Cost of fix (one-time)", money(sc.cost)],
+        [paybackLabel, e.status === "ok" ? yearsFmt(e.paybackYears) : `<span class="reason">${why[e.status]}</span>`],
       );
-      if (e.status === "ok") worked += `<br>Payback = ${money(sc.cost.value)} ÷ ${money(e.annualSavings)} per year`;
+      if (e.status === "ok") worked += `<br>Payback = ${money(sc.cost)} ÷ ${money(e.annualSavings)} per year`;
     }
     return { ...sc, rows, worked };
   };
   const cards = runs.map(card);
-
   if (target == null) cards.push({ key: "cut", title: "Cut the rework rate", change: `${stepName}: ${pct(fromRate, 2)} → target not set`, pending: true });
 
   const fixes = cards.filter(c => c.econ && c.econ.status === "ok");
-  const best = fixes.length === 2 ? fixes.reduce((a, b) => (a.econ.paybackYears <= b.econ.paybackYears ? a : b)).key : null;
+  const best = fixes.length === 2 ? fixes.reduce((x, y) => (x.econ.paybackYears <= y.econ.paybackYears ? x : y)).key : null;
 
   $("scenario-cards").innerHTML = cards.map(sc => sc.pending ? `
     <article class="scenario pending">
@@ -535,18 +540,28 @@ function renderScenarios() {
       ${best === sc.key ? `<p class="badge">Pays back sooner</p>` : ""}
       <h3>${sc.title}</h3><p class="change">${sc.change}</p>
       <dl>${sc.rows.map(([k, v]) => `<div><dt>${k}</dt><dd>${v}</dd></div>`).join("")}</dl>
-      <p class="worked">${sc.worked}</p>
+      ${sc.worked ? `<p class="worked">${sc.worked}</p>` : ""}
     </article>`).join("");
 
+  // Which settings these are: the data as given, or changed on Explore.
+  const changed = !atDefaults() || state.stepperCost !== defaults().stepperCost || state.projectCost !== defaults().projectCost;
+  $("scenario-settings").innerHTML = changed
+    ? `<strong>Using your Explore settings</strong>, not the data as given. <a href="#explore">Change them on Explore</a>, or use Reset there to return to the validated numbers.`
+    : `<strong>Using the data as given</strong> (the validated hand calculation). Change the sliders or costs on <a href="#explore">Explore</a> and these scenarios update.`;
+  $("scenario-settings").classList.toggle("changed", changed);
+
   const add = cards.find(c => c.key === "add"), cut = cards.find(c => c.key === "cut");
-  let answer = "";
-  if (add.econ?.status === "ok") {
-    answer = `Adding a ${ordinal(mNew)} stepper cuts the wait from <strong>${hfmt(cur.Wq)} to ${hfmt(add.result.Wq)} hours</strong> and saves ${money(add.econ.annualSavings)} a year in holding cost, so its ${money(add.cost.value)} price pays back in <strong>${yearsFmt(add.econ.paybackYears)}</strong>.`;
-  }
-  if (cut && !cut.pending && cut.econ?.status === "ok") {
-    answer += ` Cutting rework to ${pct(target, 2)} cuts the wait to ${hfmt(cut.result.Wq)} hours and pays back in <strong>${yearsFmt(cut.econ.paybackYears)}</strong>.`;
-  } else if (cut?.pending) {
-    answer += ` The rework scenario is waiting on Peixuan’s target rate.`;
+  let answer;
+  if (!cur.stable) {
+    answer = `At these settings the ${state.m} steppers are over capacity (${pct(cur.rho)} busy), so the line grows without limit. ${add.result.stable ? `Adding a ${ordinal(mNew)} stepper brings it back under capacity.` : "Adding one stepper isn’t enough."}`;
+  } else {
+    answer = add.econ.status === "ok"
+      ? `Adding a ${ordinal(mNew)} stepper cuts the wait from <strong>${hfmt(cur.Wq)} to ${hfmt(add.result.Wq)} hours</strong> and saves ${money(add.econ.annualSavings)} a year in holding cost, so its ${money(state.stepperCost)} price pays back in <strong>${yearsFmt(add.econ.paybackYears)}</strong>.`
+      : `Adding a ${ordinal(mNew)} stepper cuts the wait from <strong>${hfmt(cur.Wq)} to ${hfmt(add.result.Wq)} hours</strong>.`;
+    if (cut?.pending) answer += ` The rework scenario is waiting on Peixuan’s target rate.`;
+    else if (atTarget) answer += ` Rework is already at or below the ${pct(target, 2)} target at these settings, so cutting it saves nothing more.`;
+    else if (cut?.econ.status === "ok") answer += ` Cutting rework to ${pct(target, 2)} cuts the wait to ${hfmt(cut.result.Wq)} hours and pays back in <strong>${yearsFmt(cut.econ.paybackYears)}</strong>.`;
+    else if (cut) answer += ` Cutting rework to ${pct(target, 2)} cuts the wait to ${hfmt(cut.result.Wq)} hours.`;
   }
   $("scenario-answer").innerHTML = answer;
 
@@ -612,12 +627,12 @@ document.addEventListener("DOMContentLoaded", () => {
   renderData();
   renderCheck();
   renderCosts();
-  renderScenarios();
 
   state = defaults();
   syncControls();
   document.querySelectorAll("[data-key]").forEach(el => el.addEventListener("input", onInput));
   $("reset").addEventListener("click", () => { state = defaults(); syncControls(); safeRenderExplore(); });
+  safeRenderExplore();   // fills Explore and Scenarios, whichever tab the page opens on
 
   showPage();
   if (typeof runSelfChecks === "function") runSelfChecks();

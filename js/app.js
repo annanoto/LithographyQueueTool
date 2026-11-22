@@ -84,10 +84,10 @@ const inputs = {
 
   // Module 3 scenarios.
   scenarios: {
-    addSteppers: 1,             // 5 tools -> 6
-    reworkTarget: {             // MISSING: Peixuan's target rework rate for 072_Litho (Product 3 Step 65), as a decimal
-      value: null,
-      source: "",
+    addSteppers: 1,             // 5 tools -> 6, rework stays at 1.7% (confirmed by Peixuan)
+    reworkTarget: {             // Peixuan's target rework rate for 072_Litho (Product 3 Step 65), as a decimal
+      value: 0.005,             // 1.7% -> 0.5%
+      source: "Peixuan: the bottom of the SMT2020 rework range (0.5%–2%). Keeps 5 tools; the stepper scenario keeps rework at 1.7%.",
     },
   },
 

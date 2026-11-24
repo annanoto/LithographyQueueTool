@@ -273,3 +273,7 @@ footer a { color: var(--teal); }
 .chain .eq { font-family: "Cambria Math", Cambria, "Times New Roman", serif; font-size: 1.02rem; }
 .chain .val { float: right; margin-left: 0.75rem; font-weight: 800; color: var(--teal); white-space: nowrap; }
 .chain sub, .chain sup { font-size: 0.7em; }
+
+/* Scenarios summary: full width, one sentence per line */
+#scenario-answer { max-width: none; }
+#scenario-answer .line { display: block; }

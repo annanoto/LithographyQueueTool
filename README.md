@@ -23,11 +23,11 @@ The main page, built for trying different values.
 
 - **Sliders** (ranges confirmed by Peixuan): rework rate (0.5%–2%), number of steppers (1–8), availability (70%–99%), and arrival variability cₐ² (0–3). Each starts at the data’s value.
 - **Cost boxes:** cost of waiting, cost of an extra stepper, and cost of the rework project, prefilled with Isabella’s baselines.
-- **Reset to the data** puts every input back.
-- **Results that update instantly:** a one-sentence answer and five headline numbers (utilization, wait in queue, time at stepper, lots waiting, weekly cost of waiting). Once an input changes, each number also shows its "data as given" value.
-- **Wait vs. utilization chart:** the gold dot moves with the inputs; a hollow dot marks the data as given.
-- **Payback at these settings:** payback for each fix, starting from the current inputs.
-- **How the wait is calculated:** the five steps (arrivals, job mix, downtime, utilization, wait) with live values.
+- **Reset to data** puts every input back.
+- **Results that update instantly:** a one-sentence answer and five headline numbers (utilization, queue time, cycle time, WIP in queue, queue cost per week). Once an input changes, each number also shows its "data as given" value.
+- **Queue time vs. utilization chart:** the gold wafer marker moves with the inputs; a hollow dot marks "today" (the data as given).
+- **Payback:** payback for each fix, starting from the current inputs.
+- **Calculation chain:** each equation, from arrival rate to WIP in queue, with live values.
 
 ### Scenarios
 The three scenarios side by side, each showing utilization, wait in queue, lots waiting, yearly cost of the wait, and (for the fixes) yearly savings, cost of the fix, and payback.
@@ -53,11 +53,11 @@ The inputs, always using the data as given (the sliders don’t change this page
 - **Breakdowns and scheduled maintenance:** how often each happens, how long it lasts, and its share of time down.
 - **Data to collect:** every input with its value and source; anything missing is marked in red.
 
-### Check against hand calc
+### Validation
 Always uses the data as given, so the comparison with the hand calculation stays valid.
 
-- **Site vs. hand calculation:** all 19 values from Peixuan’s hand calculation next to the site’s values, with the difference and a match column.
-- **Self-checks:** 27 tests against cases with known answers, the hand calculation, and the financial formulas.
+- **Site vs. hand calc:** all 19 values from Peixuan’s hand calculation next to the site’s values, with the difference and a match column.
+- **Unit tests:** 27 tests against cases with known answers, the hand calculation, and the financial formulas.
 
 ## Baseline costs (Isabella)
 

@@ -3,19 +3,19 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Lithography Queue & Payback Tool</title>
+  <title>Lithography Queue &amp; Payback Tool</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=14">
-  <script src="js/calc.js?v=14" defer></script>
-  <script src="js/tests.js?v=14" defer></script>
-  <script src="js/app.js?v=14" defer></script>
+  <link rel="stylesheet" href="style.css?v=16">
+  <script src="js/calc.js?v=16" defer></script>
+  <script src="js/tests.js?v=16" defer></script>
+  <script src="js/app.js?v=16" defer></script>
 </head>
 <body>
   <header class="top">
     <div class="title">
-      <h1>Lithography Queue & Payback Tool</h1>
+      <h1>Lithography Queue &amp; Payback Tool</h1>
       <p class="lede">How long lots wait for the Litho_FE_98 steppers, what that wait costs, and how two fixes compare, calculated from SMT2020 benchmark fab data.</p>
     </div>
   </header>
@@ -116,7 +116,8 @@
 
     <!-- Costs -->
     <section id="page-costs" class="page" hidden>
-      <p id="cost-answer" class="answer"></p>
+      <p id="cost-settings" class="settings-note"></p>
+      <p id="cost-answer" class="answer" aria-live="polite"></p>
 
       <div class="panel">
         <h2>How the delay cost is calculated</h2>
@@ -125,13 +126,13 @@
 
       <div class="panel">
         <h2>Delay cost across the range of waiting costs</h2>
-        <p class="muted">No published figure exists for the cost of a waiting lot, so here is the full sourced range.</p>
+        <p class="muted">No published figure exists for the cost of a waiting lot, so here is the full sourced range, using the lots waiting at your Explore settings.</p>
         <div id="cost-range" class="scroll"></div>
       </div>
 
       <div class="panel">
         <h2>Cost assumptions</h2>
-        <p class="muted">From the Litho Rework Cost Assumptions doc; numbers in brackets are its sources. The stepper and project costs are used for payback on the Scenarios page. Edit them in <code>js/app.js</code>.</p>
+        <p class="muted">From the Litho Rework Cost Assumptions doc; numbers in brackets are its sources. These are the baselines and don’t change with Explore. The stepper and project costs are used for payback on the Scenarios page. Edit them in <code>js/app.js</code>.</p>
         <div id="cost-assumptions" class="scroll"></div>
         <p class="muted limits">The cost of waiting here is holding cost only. Waiting also delays revenue and can lower yield, and at a bottleneck the bigger cost is lost output, which this figure doesn’t include.</p>
       </div>
@@ -139,6 +140,7 @@
 
     <!-- Data -->
     <section id="page-data" class="page" hidden>
+      <p class="settings-note fixed"><strong>Always the data as given.</strong> This page lists the SMT2020 inputs and their sources, so the Explore sliders don’t change it.</p>
       <div class="panel">
         <h2>Lithography steps at this tool group</h2>
         <p class="muted">One row for each step and lot type. Times in minutes.</p>
@@ -158,6 +160,7 @@
 
     <!-- Check against hand calc -->
     <section id="page-check" class="page" hidden>
+      <p class="settings-note fixed"><strong>Always the data as given.</strong> The hand calculation uses the SMT2020 data, so this page ignores the Explore sliders. That way the comparison stays valid.</p>
       <div class="panel">
         <h2>Site vs. hand calculation</h2>
         <p id="check-summary" class="answer"></p>

@@ -574,19 +574,21 @@ function renderScenarios() {
   $("scenario-settings").classList.toggle("changed", changed);
 
   const add = cards.find(c => c.key === "add"), cut = cards.find(c => c.key === "cut");
-  let answer;
+  // One sentence per line: the stepper result, then the rework result.
+  const lines = [];
   if (!cur.stable) {
-    answer = `${state.m} steppers at ${pct(cur.rho)} utilization: over capacity. ${add.result.stable ? `A ${ordinal(mNew)} stepper brings it back under.` : "One more stepper isn’t enough."}`;
+    lines.push(`${state.m} steppers at ${pct(cur.rho)} utilization: over capacity.`);
+    lines.push(add.result.stable ? `A ${ordinal(mNew)} stepper brings it back under.` : "One more stepper isn’t enough.");
   } else {
-    answer = add.econ.status === "ok"
+    lines.push(add.econ.status === "ok"
       ? `A ${ordinal(mNew)} stepper cuts queue time from ${hfmt(cur.Wq)} to <strong>${hfmt(add.result.Wq)} h</strong> but pays back in <strong>${yearsFmt(add.econ.paybackYears)}</strong>.`
-      : `A ${ordinal(mNew)} stepper cuts queue time from ${hfmt(cur.Wq)} to <strong>${hfmt(add.result.Wq)} h</strong>.`;
-    if (cut?.pending) answer += ` The rework scenario is waiting on Peixuan’s target rate.`;
-    else if (atTarget) answer += ` Rework is already at the ${pct(target, 2)} target.`;
-    else if (cut?.econ.status === "ok") answer += ` Cutting rework to ${pct(target, 2)} only gets it to ${hfmt(cut.result.Wq)} h, but pays back in <strong>${yearsFmt(cut.econ.paybackYears)}</strong>.`;
-    else if (cut) answer += ` Cutting rework to ${pct(target, 2)} gets it to ${hfmt(cut.result.Wq)} h.`;
+      : `A ${ordinal(mNew)} stepper cuts queue time from ${hfmt(cur.Wq)} to <strong>${hfmt(add.result.Wq)} h</strong>.`);
+    if (cut?.pending) lines.push("The rework scenario is waiting on Peixuan’s target rate.");
+    else if (atTarget) lines.push(`Rework is already at the ${pct(target, 2)} target.`);
+    else if (cut?.econ.status === "ok") lines.push(`Cutting rework to ${pct(target, 2)} only gets it to ${hfmt(cut.result.Wq)} h, but pays back in <strong>${yearsFmt(cut.econ.paybackYears)}</strong>.`);
+    else if (cut) lines.push(`Cutting rework to ${pct(target, 2)} gets it to ${hfmt(cut.result.Wq)} h.`);
   }
-  $("scenario-answer").innerHTML = answer;
+  $("scenario-answer").innerHTML = lines.map(l => `<span class="line">${l}</span>`).join(" ");
 
   const missing = [];
   if (target == null) missing.push(`Peixuan’s target rework rate for ${stepName}`);

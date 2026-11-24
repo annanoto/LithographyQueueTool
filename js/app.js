@@ -15,7 +15,7 @@
   Filled with Litho_FE_98 from the Dataset and Calculations docs, and costs from the Cost Assumptions doc.
 */
 const inputs = {
-  toolGroup: "Litho_FE_98",   // PLACEHOLDER: tool group Peixuan chooses
+  toolGroup: "Litho_FE_98",   // chosen tool group from data
   m: 5,                       // parallel tools in the group (Toolgroups, row 66)
   loadMin: 1,                 // loading time per lot (Toolgroups, row 66)
   unloadMin: 1,               // unloading time per lot (Toolgroups, row 66)

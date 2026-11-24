@@ -356,7 +356,7 @@ function onInput(e) {
 }
 
 function safeRenderExplore() {
-  try { renderExplore(); renderScenarios(); }
+  try { renderExplore(); renderScenarios(); renderCosts(); }
   catch (err) { $("answer").innerHTML = `<span class="warn-text">These settings can’t be calculated:</span> ${err.message}`; }
 }
 
@@ -428,25 +428,39 @@ function renderData() {
 }
 
 /* ---------- Costs (Phase 2: delay cost of the current state) ---------- */
+// Costs follows the Explore settings: lots waiting from the sliders, cost of waiting from the cost box.
+// The assumptions table always shows the sourced baselines.
 function renderCosts() {
-  const r = base, HPW = Calc.HOURS_PER_WEEK;
+  const r = runWith(), HPW = Calc.HOURS_PER_WEEK;
   const wait = inputs.costs.waitingPerLotHour;
-  const weekly = Calc.weeklyWaitCost(r, wait.value);
+  const c$ = state.waitCost;                       // cost of waiting in use (cost box)
+  const weekly = Calc.weeklyWaitCost(r, c$);
+  const isBaseline = c$ != null && Math.abs(c$ - wait.value) < 1e-9;
 
-  $("cost-answer").innerHTML = r.stable
-    ? `On average about <strong>${fmt(r.Lq, 3)} lots</strong> are waiting at ${inputs.toolGroup}. At ${money(wait.value)} per lot-hour, that waiting costs about <strong>${money(weekly)} a week</strong> (${money(Calc.annualWaitCost(r, wait.value))} a year) in holding cost.`
-    : `The steppers are over capacity, so the queue and its cost grow without limit.`;
+  const changed = !atDefaults();
+  $("cost-settings").innerHTML = changed
+    ? `<strong>Using your Explore settings</strong>, not the data as given. <a href="#explore">Change them on Explore</a>, or use Reset there to return to the validated numbers.`
+    : `<strong>Using the data as given</strong>. Change the sliders or the cost of waiting on <a href="#explore">Explore</a> and this page updates.`;
+  $("cost-settings").classList.toggle("changed", changed);
 
-  $("cost-worked").innerHTML = r.stable ? `
+  $("cost-answer").innerHTML = !r.stable
+    ? `At these settings the steppers are over capacity, so the queue and its cost grow without limit.`
+    : c$ == null
+      ? `On average about <strong>${fmt(r.Lq, 3)} lots</strong> are waiting at ${inputs.toolGroup}. Enter the cost of waiting on <a href="#explore">Explore</a> to see what that costs.`
+      : `On average about <strong>${fmt(r.Lq, 3)} lots</strong> are waiting at ${inputs.toolGroup}. At ${money(c$)} per lot-hour, that waiting costs about <strong>${money(weekly)} a week</strong> (${money(Calc.annualWaitCost(r, c$))} a year) in holding cost.`;
+
+  $("cost-worked").innerHTML = r.stable && c$ != null ? `
     <ol class="worked-steps">
       <li><span>Lots waiting, from Little’s Law</span>
         <code>L<sub>q</sub> = λ × W<sub>q</sub> = ${fmt(r.lambda, 6)} visits/min × ${fmt(r.Wq, 6)} min = ${fmt(r.Lq, 6)} lots</code></li>
       <li><span>Cost of waiting per lot-hour</span>
-        <code>25 wafers × ${money(wait.parts.base.waferCost)} × ${pct(wait.parts.base.carryingRate, 2)} ÷ 8,760 h = ${money(wait.value)}</code></li>
+        <code>${isBaseline
+          ? `25 wafers × ${money(wait.parts.base.waferCost)} × ${pct(wait.parts.base.carryingRate, 2)} ÷ 8,760 h = ${money(c$)} (Isabella’s baseline)`
+          : `${money(c$)}, entered on Explore (baseline ${money(wait.value)})`}</code></li>
       <li><span>Weekly delay cost</span>
-        <code>${fmt(r.Lq, 6)} lots × ${HPW} h × ${money(wait.value)} = ${money(weekly)}</code></li>
+        <code>${fmt(r.Lq, 6)} lots × ${HPW} h × ${money(c$)} = ${money(weekly)}</code></li>
       <li><span>Yearly delay cost</span>
-        <code>${fmt(r.Lq, 6)} lots × ${money(wait.value)} × ${Calc.HOURS_PER_YEAR.toLocaleString("en-US")} h = ${money(Calc.annualWaitCost(r, wait.value))}</code></li>
+        <code>${fmt(r.Lq, 6)} lots × ${money(c$)} × ${Calc.HOURS_PER_YEAR.toLocaleString("en-US")} h = ${money(Calc.annualWaitCost(r, c$))}</code></li>
     </ol>` : "";
 
   const cases = [
@@ -456,12 +470,15 @@ function renderCosts() {
     ["Advanced wafer, 20% carrying", Calc.carryingCostPerLotHour(25, wait.parts.high.waferCost, wait.parts.low.carryingRate)],
     ["Advanced wafer, 30% carrying", wait.high],
   ];
+  if (c$ != null && !cases.some(([, v]) => Math.abs(v - c$) < 0.005)) cases.push(["Your value on Explore", c$]);
+  cases.sort((x, y) => x[1] - y[1]);
   $("cost-range").innerHTML = `
     <table>
       <thead><tr><th>Cost of waiting</th><th class="num">$ per lot-hour</th><th class="num">Weekly delay cost</th><th class="num">Yearly delay cost</th></tr></thead>
       <tbody>${cases.map(([label, c]) => {
         const w = Calc.weeklyWaitCost(r, c);
-        return `<tr><td>${label}</td><td class="num">${money(c)}</td><td class="num">${money(w)}</td><td class="num">${money(Calc.annualWaitCost(r, c))}</td></tr>`;
+        const inUse = c$ != null && Math.abs(c - c$) < 0.005;
+        return `<tr${inUse ? ' class="in-use"' : ""}><td>${label}${inUse ? ' <span class="tag">in use</span>' : ""}</td><td class="num">${money(c)}</td><td class="num">${money(w)}</td><td class="num">${money(Calc.annualWaitCost(r, c))}</td></tr>`;
       }).join("")}</tbody>
     </table>`;
 
@@ -626,7 +643,6 @@ document.addEventListener("DOMContentLoaded", () => {
   }
   renderData();
   renderCheck();
-  renderCosts();
 
   state = defaults();
   syncControls();

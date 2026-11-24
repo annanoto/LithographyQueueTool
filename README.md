@@ -40,20 +40,22 @@ The three scenarios side by side, each showing utilization, wait in queue, lots 
 - Each card shows its worked numbers (e.g., Payback = $75,000 ÷ $16,996 per year).
 
 ### Costs
-The delay cost of the current queue, using the data as given (this page does not follow the sliders).
+The delay cost of the current queue. It follows the Explore inputs, and a note at the top says whether it is using the data as given or changed settings.
 
 - **How the delay cost is calculated:** Lq from Little’s Law, cost per lot-hour, and weekly and yearly delay cost, with the numbers shown.
-- **Delay cost across the range of waiting costs:** from 28nm to advanced-node wafer values, since no published cost per lot-hour exists.
-- **Cost assumptions:** each baseline, its range, and its source.
+- **Delay cost across the range of waiting costs:** from 28nm to advanced-node wafer values, since no published cost per lot-hour exists. The row matching the cost of waiting in use is highlighted.
+- **Cost assumptions:** each baseline, its range, and its source. These stay fixed.
 
 ### Data
-The inputs, using the data as given.
+The inputs, always using the data as given (the sliders don’t change this page).
 
 - **Lithography steps at this tool group:** one row for each step and lot type, with release interval, wafers, lot time, rework, visit rate, and share.
 - **Breakdowns and scheduled maintenance:** how often each happens, how long it lasts, and its share of time down.
 - **Data to collect:** every input with its value and source; anything missing is marked in red.
 
 ### Check against hand calc
+Always uses the data as given, so the comparison with the hand calculation stays valid.
+
 - **Site vs. hand calculation:** all 19 values from Peixuan’s hand calculation next to the site’s values, with the difference and a match column.
 - **Self-checks:** 27 tests against cases with known answers, the hand calculation, and the financial formulas.
 

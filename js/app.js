@@ -114,8 +114,8 @@ const yearsFmt = y => y == null ? "—" : !Number.isFinite(y) ? "Never"
   : y < 1 / 12 ? `${fmt(y * 52.14, 2)} weeks` : y < 1 ? `${fmt(y * 12, 3)} months` : `${fmt(y, 3)} years`;
 const ordinal = n => n + (["th", "st", "nd", "rd"][((n % 100) - 20) % 10] || ["th", "st", "nd", "rd"][n % 100] || "th");
 const reworkStep = inputs.steps.find(s => s.reworkProb != null);
-// A wafer (circle with a flat) marks "today" on the chart and in its legend.
-const WAFER_KEY = `<svg class="key-wafer" viewBox="0 0 24 24" aria-hidden="true"><path d="M6.34 19A9 9 0 1 1 17.66 19Z"/></svg>`;
+// The gold dot marks the current inputs on the chart and in its legend.
+const WAFER_KEY = `<span class="key-here"></span>`;
 const PAGES = ["explore", "scenarios", "costs", "data", "check"];
 let base = null;   // the data as given: the validated hand-calc run
 let state = null;  // slider and cost-box values on the Explore page
@@ -210,9 +210,7 @@ function lineChart(o) {
         ${p.label.map((t, i) => `<tspan x="${tx}" dy="${i ? 20 : 0}">${t}</tspan>`).join("")}</text>`;
     }
     const drop = p.cls === "here" ? `<line class="here-line" x1="${px}" x2="${px}" y1="${py}" y2="${H - M.b}"/>` : "";
-    const dot = p.cls === "here"
-      ? `<path class="here" d="M${(px - 7.14).toFixed(1)} ${(py + 7).toFixed(1)}A10 10 0 1 1 ${(px + 7.14).toFixed(1)} ${(py + 7).toFixed(1)}Z"/>`
-      : `<circle class="${p.cls}" cx="${px}" cy="${py}" r="7"/>`;
+    const dot = `<circle class="${p.cls}" cx="${px}" cy="${py}" r="${p.cls === "here" ? 9 : 7}"/>`;
     return `${drop}${dot}${label}`;
   }).join("");
 
@@ -278,7 +276,7 @@ function renderExplore() {
     item("Queue time", hfmt(cur.Wq), "h", was(`${hfmt(base.Wq)} h`), true) +
     item("Cycle time", hfmt(cur.cycleTime), "h", was(`${hfmt(base.cycleTime)} h`)) +
     item("WIP in queue", fmt(cur.Lq, 3), "lots", was(fmt(base.Lq, 3))) +
-    item("Queue cost", money(weekly), "/wk", was(money(weeklyBase)));
+    item("Queue cost / wk", money(weekly), "", was(money(weeklyBase)));
 
   // Chart: the curve for these settings, a moving dot, and a hollow dot for the data as given.
   const el = $("curve");
@@ -486,7 +484,7 @@ function renderCosts() {
       <tbody>${cases.map(([label, c]) => {
         const w = Calc.weeklyWaitCost(r, c);
         const inUse = c$ != null && Math.abs(c - c$) < 0.005;
-        return `<tr${inUse ? ' class="in-use"' : ""}><td>${label}${inUse ? ' <span class="in-use-label">in use</span>' : ""}</td><td class="num">${money(c)}</td><td class="num">${money(w)}</td><td class="num">${money(Calc.annualWaitCost(r, c))}</td></tr>`;
+        return `<tr${inUse ? ' class="in-use"' : ""}><td>${label}${inUse ? ' <span class="label-tag in-use-label">in use</span>' : ""}</td><td class="num">${money(c)}</td><td class="num">${money(w)}</td><td class="num">${money(Calc.annualWaitCost(r, c))}</td></tr>`;
       }).join("")}</tbody>
     </table>`;
 

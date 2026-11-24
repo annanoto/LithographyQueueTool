@@ -4,19 +4,26 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Lithography Queue &amp; Payback Tool</title>
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cpath d='M8.2 26.4A12.5 12.5 0 1 1 23.8 26.4Z' fill='%2303515f'/%3E%3Cg fill='%23f3f3f3'%3E%3Crect x='10' y='9' width='3' height='3'/%3E%3Crect x='14.5' y='9' width='3' height='3'/%3E%3Crect x='19' y='9' width='3' height='3'/%3E%3Crect x='10' y='13.5' width='3' height='3'/%3E%3Crect x='14.5' y='13.5' width='3' height='3' fill='%23bb963d'/%3E%3Crect x='19' y='13.5' width='3' height='3'/%3E%3Crect x='10' y='18' width='3' height='3'/%3E%3Crect x='14.5' y='18' width='3' height='3'/%3E%3Crect x='19' y='18' width='3' height='3'/%3E%3C/g%3E%3C/svg%3E">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=16">
-  <script src="js/calc.js?v=16" defer></script>
-  <script src="js/tests.js?v=16" defer></script>
-  <script src="js/app.js?v=16" defer></script>
+  <link rel="stylesheet" href="style.css?v=17">
+  <script src="js/calc.js?v=17" defer></script>
+  <script src="js/tests.js?v=17" defer></script>
+  <script src="js/app.js?v=17" defer></script>
 </head>
 <body>
   <header class="top">
     <div class="title">
-      <h1>Lithography Queue &amp; Payback Tool</h1>
-      <p class="lede">How long lots wait for the Litho_FE_98 steppers, what that wait costs, and how two fixes compare, calculated from SMT2020 benchmark fab data.</p>
+      <h1>
+        <svg class="mark" viewBox="0 0 32 32" aria-hidden="true">
+          <path d="M8.2 26.4A12.5 12.5 0 1 1 23.8 26.4Z" fill="none" stroke="currentColor" stroke-width="2"/>
+          <g fill="currentColor"><rect x="10" y="9" width="3" height="3"/><rect x="14.5" y="9" width="3" height="3"/><rect x="19" y="9" width="3" height="3"/><rect x="10" y="13.5" width="3" height="3"/><rect class="mark-die" x="14.5" y="13.5" width="3" height="3"/><rect x="19" y="13.5" width="3" height="3"/><rect x="10" y="18" width="3" height="3"/><rect x="14.5" y="18" width="3" height="3"/><rect x="19" y="18" width="3" height="3"/></g>
+        </svg>
+        Lithography Queue &amp; Payback Tool
+      </h1>
+      <p class="lede">Queue time and delay cost at Litho_FE_98, and whether a sixth stepper or less rework pays off. SMT2020 dataset 1.</p>
     </div>
   </header>
 
@@ -26,26 +33,24 @@
       <a href="#scenarios" data-page="scenarios">Scenarios</a>
       <a href="#costs" data-page="costs">Costs</a>
       <a href="#data" data-page="data">Data</a>
-      <a href="#check" data-page="check">Check against hand calc</a>
+      <a href="#check" data-page="check">Validation</a>
     </div>
   </nav>
 
   <main>
-    <!-- Explore (Module 4): sliders on the left, results that update on the right.
-         Slider ranges confirmed by Peixuan: rework 0.5–2%, tools 1–8, availability 70–99%, ca² 0–3. -->
+    <!-- Explore (Module 4). Slider ranges confirmed by Peixuan: rework 0.5–2%, tools 1–8, availability 70–99%, ca² 0–3. -->
     <section id="page-explore" class="page">
       <div class="explore">
         <aside class="panel controls" aria-label="Inputs">
-          <h2>Try different values</h2>
-          <p class="muted">Results update as you move a slider.</p>
+          <h2>Inputs</h2>
 
           <div class="field">
-            <div class="field-head"><label for="in-rework">Rework rate</label><output id="out-rework" for="in-rework"></output></div>
+            <div class="field-head"><label for="in-rework">Rework rate, 072_Litho</label><output id="out-rework" for="in-rework"></output></div>
             <input type="range" id="in-rework" data-key="reworkProb" min="0.005" max="0.02" step="0.001">
             <p class="hint" id="hint-rework"></p>
           </div>
           <div class="field">
-            <div class="field-head"><label for="in-m">Number of steppers</label><output id="out-m" for="in-m"></output></div>
+            <div class="field-head"><label for="in-m">Steppers</label><output id="out-m" for="in-m"></output></div>
             <input type="range" id="in-m" data-key="m" min="1" max="8" step="1">
             <p class="hint" id="hint-m"></p>
           </div>
@@ -55,29 +60,29 @@
             <p class="hint" id="hint-A"></p>
           </div>
           <div class="field">
-            <div class="field-head"><label for="in-ca">Arrival variability c<sub>a</sub>²</label><output id="out-ca" for="in-ca"></output></div>
+            <div class="field-head"><label for="in-ca">Arrival SCV c<sub>a</sub>²</label><output id="out-ca" for="in-ca"></output></div>
             <input type="range" id="in-ca" data-key="caSq" min="0" max="3" step="0.05">
             <p class="hint" id="hint-ca"></p>
           </div>
 
           <h3 class="controls-sub">Costs</h3>
           <div class="field">
-            <label for="in-wait">Cost of waiting <span class="unit">$ per lot-hour</span></label>
+            <label for="in-wait">Cost of waiting <span class="unit">$/lot-h</span></label>
             <input type="number" id="in-wait" data-key="waitCost" min="0" step="any" inputmode="decimal">
             <p class="hint" id="hint-wait"></p>
           </div>
           <div class="field">
-            <label for="in-stepper">Cost of an extra stepper <span class="unit">$</span></label>
+            <label for="in-stepper">Extra stepper <span class="unit">$</span></label>
             <input type="number" id="in-stepper" data-key="stepperCost" min="0" step="any" inputmode="decimal">
             <p class="hint" id="hint-stepper"></p>
           </div>
           <div class="field">
-            <label for="in-project">Cost of the rework project <span class="unit">$</span></label>
+            <label for="in-project">Rework project <span class="unit">$</span></label>
             <input type="number" id="in-project" data-key="projectCost" min="0" step="any" inputmode="decimal">
             <p class="hint" id="hint-project"></p>
           </div>
 
-          <button type="button" id="reset" class="button">Reset to the data</button>
+          <button type="button" id="reset" class="button">Reset to data</button>
         </aside>
 
         <div class="results">
@@ -85,20 +90,19 @@
           <dl id="readout" class="readout"></dl>
 
           <div class="panel">
-            <h2>Wait climbs steeply as the steppers fill up</h2>
+            <h2>Queue time vs. utilization</h2>
             <div id="curve" class="chart"></div>
             <p id="chart-legend" class="legend"></p>
-            <p class="muted">The curve holds everything else fixed and changes only the load. Near 100% busy, a small rise in load causes a large jump in wait.</p>
           </div>
 
           <div class="pair">
             <div class="panel">
-              <h2>Payback at these settings</h2>
+              <h2>Payback</h2>
               <div id="paybacks"></div>
             </div>
             <div class="panel">
-              <h2>How the wait is calculated</h2>
-              <ol id="route" class="route"></ol>
+              <h2>Calculation chain</h2>
+              <ol id="route" class="chain"></ol>
             </div>
           </div>
         </div>
@@ -111,7 +115,7 @@
       <p id="scenario-answer" class="answer" aria-live="polite"></p>
       <div id="scenario-cards" class="scenarios"></div>
       <p id="scenario-missing" class="missing-banner"></p>
-      <p class="muted">Each scenario reruns the whole calculation, from arrival rate to wait. The scenarios start from the settings on Explore; at the data as given, the current state is the validated hand calculation. Cost of the wait is holding cost only (L<sub>q</sub> × cost per lot-hour × 8,760 h a year); see the Costs page for the assumptions.</p>
+      <p class="muted">Queue cost = L<sub>q</sub> × $/lot-h × 8,760 h/yr (holding cost only).</p>
     </section>
 
     <!-- Costs -->
@@ -120,63 +124,59 @@
       <p id="cost-answer" class="answer" aria-live="polite"></p>
 
       <div class="panel">
-        <h2>How the delay cost is calculated</h2>
+        <h2>Delay cost</h2>
         <div id="cost-worked"></div>
       </div>
 
       <div class="panel">
-        <h2>Delay cost across the range of waiting costs</h2>
-        <p class="muted">No published figure exists for the cost of a waiting lot, so here is the full sourced range, using the lots waiting at your Explore settings.</p>
+        <h2>Sensitivity to the cost of waiting</h2>
+        <p class="muted">No published figure exists, so this is the full sourced range.</p>
         <div id="cost-range" class="scroll"></div>
       </div>
 
       <div class="panel">
         <h2>Cost assumptions</h2>
-        <p class="muted">From the Litho Rework Cost Assumptions doc; numbers in brackets are its sources. These are the baselines and don’t change with Explore. The stepper and project costs are used for payback on the Scenarios page. Edit them in <code>js/app.js</code>.</p>
+        <p class="muted">Baselines from the Litho Rework Cost Assumptions doc (sources in brackets).</p>
         <div id="cost-assumptions" class="scroll"></div>
-        <p class="muted limits">The cost of waiting here is holding cost only. Waiting also delays revenue and can lower yield, and at a bottleneck the bigger cost is lost output, which this figure doesn’t include.</p>
+        <p class="muted limits">Holding cost only: lost output, delayed revenue and yield effects are not included.</p>
       </div>
     </section>
 
     <!-- Data -->
     <section id="page-data" class="page" hidden>
-      <p class="settings-note fixed"><strong>Always the data as given.</strong> This page lists the SMT2020 inputs and their sources, so the Explore sliders don’t change it.</p>
+      <p class="settings-note fixed">Data as given. Not affected by Explore.</p>
       <div class="panel">
-        <h2>Lithography steps at this tool group</h2>
-        <p class="muted">One row for each step and lot type. Times in minutes.</p>
+        <h2>Litho_FE_98 steps</h2>
         <div id="steps" class="scroll"></div>
       </div>
       <div class="panel">
-        <h2>Breakdowns and scheduled maintenance</h2>
-        <p class="muted">Downtime that sets availability and adds processing variability. Times in minutes.</p>
+        <h2>Downtime: breakdowns and PM</h2>
         <div id="downtime" class="scroll"></div>
       </div>
       <div class="panel">
-        <h2>Data to collect</h2>
-        <p class="muted">Every input that needs a value and a source. Edit them in <code>js/app.js</code>.</p>
+        <h2>Inputs and sources</h2>
         <div id="placeholders" class="scroll"></div>
       </div>
     </section>
 
-    <!-- Check against hand calc -->
+    <!-- Validation -->
     <section id="page-check" class="page" hidden>
-      <p class="settings-note fixed"><strong>Always the data as given.</strong> The hand calculation uses the SMT2020 data, so this page ignores the Explore sliders. That way the comparison stays valid.</p>
+      <p class="settings-note fixed">Data as given, so the comparison with the hand calc stays valid.</p>
       <div class="panel">
-        <h2>Site vs. hand calculation</h2>
+        <h2>Site vs. hand calc</h2>
         <p id="check-summary" class="answer"></p>
         <div id="comparison" class="scroll"></div>
       </div>
       <div class="panel">
-        <h2>Self-checks</h2>
-        <p class="muted">The calculations tested against cases with known answers, such as the single-stepper Kingman case.</p>
+        <h2>Unit tests</h2>
         <div id="checks"></div>
       </div>
     </section>
   </main>
 
   <footer>
-    <p>IE6300, Fall 2026, Northeastern University, Group 7: Anna Noto, Isabella Guzman, & Peixuan Yao</p>
-    <p class="muted">Data: Hassoun, Kopp, Kalir, and Mönch (2019), SMT2020 dataset 1, Products 3 and 4, tool group Litho_FE_98.</p>
+    <p>IE6300, Fall 2026, Northeastern University · Group 7: Anna Noto, Isabella Guzman &amp; Peixuan Yao</p>
+    <p class="muted">Data: Hassoun, Kopp, Kalir &amp; Mönch (2019), SMT2020 dataset 1 · <a href="https://github.com/annanoto/LithographyQueueTool">GitHub repo</a> · Last updated Nov 23, 2026</p>
   </footer>
 </body>
 </html>

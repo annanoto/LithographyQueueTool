@@ -114,6 +114,8 @@ const yearsFmt = y => y == null ? "—" : !Number.isFinite(y) ? "Never"
   : y < 1 / 12 ? `${fmt(y * 52.14, 2)} weeks` : y < 1 ? `${fmt(y * 12, 3)} months` : `${fmt(y, 3)} years`;
 const ordinal = n => n + (["th", "st", "nd", "rd"][((n % 100) - 20) % 10] || ["th", "st", "nd", "rd"][n % 100] || "th");
 const reworkStep = inputs.steps.find(s => s.reworkProb != null);
+// A wafer (circle with a flat) marks "today" on the chart and in its legend.
+const WAFER_KEY = `<svg class="key-wafer" viewBox="0 0 24 24" aria-hidden="true"><path d="M6.34 19A9 9 0 1 1 17.66 19Z"/></svg>`;
 const PAGES = ["explore", "scenarios", "costs", "data", "check"];
 let base = null;   // the data as given: the validated hand-calc run
 let state = null;  // slider and cost-box values on the Explore page
@@ -208,7 +210,10 @@ function lineChart(o) {
         ${p.label.map((t, i) => `<tspan x="${tx}" dy="${i ? 20 : 0}">${t}</tspan>`).join("")}</text>`;
     }
     const drop = p.cls === "here" ? `<line class="here-line" x1="${px}" x2="${px}" y1="${py}" y2="${H - M.b}"/>` : "";
-    return `${drop}<circle class="${p.cls}" cx="${px}" cy="${py}" r="${p.cls === "here" ? 9 : 7}"/>${label}`;
+    const dot = p.cls === "here"
+      ? `<path class="here" d="M${(px - 7.14).toFixed(1)} ${(py + 7).toFixed(1)}A10 10 0 1 1 ${(px + 7.14).toFixed(1)} ${(py + 7).toFixed(1)}Z"/>`
+      : `<circle class="${p.cls}" cx="${px}" cy="${py}" r="7"/>`;
+    return `${drop}${dot}${label}`;
   }).join("");
 
   return `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${o.aria}">
@@ -252,82 +257,85 @@ function renderExplore() {
   $("out-A").textContent = `${(state.availability * 100).toFixed(1)}%`;
   $("out-ca").textContent = state.caSq.toFixed(2);
   const d = defaults();
-  const costHint = (v, dv) => v == null ? "Enter a value to see payback." :
-    v === dv ? `${money(v)}, Isabella’s baseline` : `${money(v)} (baseline ${money(dv)})`;
+  const costHint = (v, dv) => v == null ? "Enter a value" :
+    v === dv ? `${money(v)} · baseline` : `${money(v)} · baseline ${money(dv)}`;
   $("hint-wait").textContent = costHint(state.waitCost, d.waitCost);
   $("hint-stepper").textContent = costHint(state.stepperCost, d.stepperCost);
   $("hint-project").textContent = costHint(state.projectCost, d.projectCost);
-  $("hint-m").textContent = cur.stable
-    ? `Data: ${inputs.m}. Each stepper is busy ${pct(cur.rho)} of the time.`
-    : `Data: ${inputs.m}. ${state.m} can’t keep up with this load.`;
+  $("hint-m").textContent = cur.stable ? `Data ${inputs.m}` : `Data ${inputs.m} · over capacity`;
 
   $("answer").innerHTML = cur.stable
-    ? `At these settings, a lot waits about <strong>${hfmt(cur.Wq)} hours</strong> for one of the ${state.m} steppers, which are busy <strong>${pct(cur.rho)}</strong> of the time. With processing, a visit takes ${hfmt(cur.cycleTime)} hours.`
-    : `With ${state.m} stepper${state.m > 1 ? "s" : ""}, the work would need them <strong>${pct(cur.rho)}</strong> busy, which isn’t possible, so the line would grow without limit. Try more steppers or higher availability.`;
+    ? `Lots wait <strong>${hfmt(cur.Wq)} h</strong> in queue for ${state.m} steppers running at <strong>${pct(cur.rho)}</strong> utilization. Cycle time at the tool group: ${hfmt(cur.cycleTime)} h.`
+    : `At ${pct(cur.rho)} utilization, ${state.m} stepper${state.m > 1 ? "s" : ""} can’t keep up: the queue grows without limit.`;
 
-  const was = v => changed ? `<p class="was">Data as given: ${v}</p>` : "";
+  const was = v => changed ? `<p class="was">data ${v}</p>` : "";
   const item = (label, value, unit, wasText, key) =>
     `<div${key ? ' class="key"' : ""}><dt>${label}</dt><dd>${value}${unit ? ` <small>${unit}</small>` : ""}</dd>${wasText}</div>`;
   const weekly = Calc.weeklyWaitCost(cur, state.waitCost);
   const weeklyBase = Calc.weeklyWaitCost(base, inputs.costs.waitingPerLotHour.value);
   $("readout").innerHTML =
     item("Utilization", pct(cur.rho), "", was(pct(base.rho))) +
-    item("Wait in queue", hfmt(cur.Wq), "hours", was(`${hfmt(base.Wq)} h`), true) +
-    item("Time at stepper", hfmt(cur.cycleTime), "hours", was(`${hfmt(base.cycleTime)} h`)) +
-    item("Lots waiting", fmt(cur.Lq, 3), "lots", was(fmt(base.Lq, 3))) +
-    item("Weekly cost of waiting", money(weekly), "", was(money(weeklyBase)));
+    item("Queue time", hfmt(cur.Wq), "h", was(`${hfmt(base.Wq)} h`), true) +
+    item("Cycle time", hfmt(cur.cycleTime), "h", was(`${hfmt(base.cycleTime)} h`)) +
+    item("WIP in queue", fmt(cur.Lq, 3), "lots", was(fmt(base.Lq, 3))) +
+    item("Queue cost", money(weekly), "/wk", was(money(weeklyBase)));
 
   // Chart: the curve for these settings, a moving dot, and a hollow dot for the data as given.
   const el = $("curve");
   const wait = rho => hrs(Calc.sakasegawaWq(state.caSq, cur.ceSq, rho, cur.te, state.m));
   const points = [];
   if (changed && base.stable) points.push({ x: base.rho, y: hrs(base.Wq), cls: "ghost" });
-  if (cur.stable) points.push({ x: cur.rho, y: hrs(cur.Wq), cls: "here", label: ["These settings", `${pct(cur.rho)} busy, ${hfmt(cur.Wq)} h wait`] });
+  if (cur.stable) points.push({ x: cur.rho, y: hrs(cur.Wq), cls: "here",
+    label: [changed ? "Your inputs" : "Today", `${pct(cur.rho)} · ${hfmt(cur.Wq)} h`] });
   el.innerHTML = (cur.stable ? "" : `<p class="warn">Utilization is ${pct(cur.rho)}. At 100% or more the queue grows without limit, so there is no average wait.</p>`) +
     lineChart({
       width: el.clientWidth, xMin: 0.3, xMax: 0.99, yCapAt: 0.95,
       xTicks: [0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9], xTicksNarrow: [0.3, 0.5, 0.7, 0.9], xFmt: x => `${Math.round(x * 100)}%`,
-      xLabel: "Utilization ρ", yLabel: "Average wait (hours)",
+      xLabel: "Utilization ρ", yLabel: "Queue time Wq (h)",
       series: [{ fn: wait, cls: "line" }], points,
       aria: `Average wait rises sharply as utilization approaches 100 percent. These settings: ${pct(cur.rho)} utilization, ${hfmt(cur.Wq)} hour wait.`,
     });
-  $("chart-legend").innerHTML = `<span class="item"><span class="key-here"></span>These settings</span>` +
-    (changed && base.stable ? `<span class="item"><span class="key-ghost"></span>Data as given</span>` : "");
+  $("chart-legend").innerHTML = `<span class="item">${WAFER_KEY}${changed ? "Your inputs" : "Today (SMT2020 data)"}</span>` +
+    (changed && base.stable ? `<span class="item"><span class="key-ghost"></span>Today</span>` : "");
 
   // Payback for each fix, starting from these settings.
   const target = inputs.scenarios.reworkTarget.value;
   const add = runWith({ m: state.m + inputs.scenarios.addSteppers });
   const eAdd = Calc.fixEconomics(cur, add, state.stepperCost, state.waitCost, 5, inputs.costs.extraStepper.annualOperatingCost || 0);
-  const why = { "current-unstable": "Over capacity now, so no payback to compare", "fix-unstable": "Still over capacity with the fix",
+  const why = { "current-unstable": "Over capacity now", "fix-unstable": "Still over capacity",
     "no-wait-cost": "Enter the cost of waiting", "no-fix-cost": "Enter the cost of the fix" };
   const line = (title, change, e, extra) => `
     <div class="payback-row">
       <div><strong>${title}</strong><span>${change}</span></div>
       <div class="payback-value">${e.status === "ok" ? yearsFmt(e.paybackYears) : `<span class="muted">${why[e.status]}</span>`}</div>
-      ${e.status === "ok" ? `<p class="muted">Saves ${money(e.annualSavings)} a year in holding cost. ${extra}</p>` : ""}
+      ${e.status === "ok" ? `<p class="muted">Saves ${money(e.annualSavings)}/yr${extra}</p>` : ""}
     </div>`;
-  let html = line("Add a stepper", `${state.m} → ${state.m + inputs.scenarios.addSteppers} steppers, ${money(state.stepperCost)}`, eAdd,
-    add.stable ? `Wait drops to ${hfmt(add.Wq)} h.` : "");
+  let html = line("Add a stepper", `${state.m} → ${state.m + inputs.scenarios.addSteppers} · ${money(state.stepperCost)}`, eAdd,
+    add.stable ? ` · queue time ${hfmt(add.Wq)} h` : "");
   if (target == null) {
     html += `<div class="payback-row"><div><strong>Cut the rework rate</strong><span>Target not set yet</span></div>
       <div class="payback-value"><span class="muted">Waiting on Peixuan’s target</span></div></div>`;
   } else {
     const cut = runWith({ reworkProb: target });
     const eCut = Calc.fixEconomics(cur, cut, state.projectCost, state.waitCost, 5, inputs.costs.reworkProject.annualOperatingCost || 0);
-    html += line("Cut the rework rate", `${pct(state.reworkProb, 2)} → ${pct(target, 2)}, ${money(state.projectCost)}`, eCut,
-      cut.stable ? `Wait drops to ${hfmt(cut.Wq)} h.` : "");
+    html += line("Cut rework", `${pct(state.reworkProb, 2)} → ${pct(target, 2)} · ${money(state.projectCost)}`, eCut,
+      cut.stable ? ` · queue time ${hfmt(cut.Wq)} h` : "");
   }
-  html += `<p class="muted small">Payback is before any yearly operating costs, which haven’t been provided yet.</p>`;
+  html += `<p class="muted small">Before operating costs.</p>`;
   $("paybacks").innerHTML = html;
 
-  const stations = [
-    ["Arrivals", `λ = ${fmt(cur.lambdaPerHour, 3)} per h`, "Lot releases of every product and lot type, plus repeat visits from rework at Step 65."],
-    ["Job mix", `c₀² = ${fmt(cur.c0Sq, 3)}`, "Steps take different times per lot (25 wafers plus load and unload), which adds variability."],
-    ["Downtime", `A = ${pct(cur.A)}, cₑ² = ${fmt(cur.ceSq, 3)}`, "Breakdowns and maintenance stretch each job and make processing less predictable."],
-    ["Utilization", `ρ = ${pct(cur.rho)}`, `The share of time each of the ${state.m} steppers is busy: λ × tₑ ÷ ${state.m}.`],
-    ["Wait", `W<sub>q</sub> = ${hfmt(cur.Wq)} h`, "Variability × utilization × processing time (Sakasegawa’s G/G/m version of Kingman’s equation)."],
+  const chain = [
+    ["Arrival rate", "λ = Σ r<sub>i</sub> · E[N<sub>i</sub>]", `${fmt(cur.lambdaPerHour, 4)} /h`],
+    ["Job mix", "c<sub>0</sub>² = Var(S<sub>0</sub>) / t̄<sub>0</sub>²", fmt(cur.c0Sq, 4)],
+    ["Availability", "A = 1 / (1 + Σ m<sub>r</sub>/m<sub>f</sub>)", pct(cur.A, 4)],
+    ["Effective time", "t<sub>e</sub> = t̄<sub>0</sub> / A", `${fmt(cur.te, 4)} min`],
+    ["Effective SCV", "c<sub>e</sub>² = c<sub>0</sub>² + A²K / t̄<sub>0</sub>", fmt(cur.ceSq, 4)],
+    ["Utilization", `ρ = λ t<sub>e</sub> / m, m = ${state.m}`, pct(cur.rho, 4)],
+    ["Queue time", "W<sub>q</sub> = ½(c<sub>a</sub>² + c<sub>e</sub>²) · ρ<sup>√(2(m+1))−1</sup> / m(1−ρ) · t<sub>e</sub>", `${hfmt(cur.Wq)} h`],
+    ["WIP in queue", "L<sub>q</sub> = λ W<sub>q</sub>", cur.stable ? `${fmt(cur.Lq, 4)} lots` : "∞"],
   ];
-  $("route").innerHTML = stations.map(([t, v, d]) => `<li><h3>${t} <span>${v}</span></h3><p>${d}</p></li>`).join("");
+  $("route").innerHTML = chain.map(([name, eq, v]) =>
+    `<li><span class="chain-name">${name}</span><span class="eq">${eq}</span><span class="val">${v}</span></li>`).join("");
 }
 
 function syncControls() {
@@ -337,9 +345,9 @@ function syncControls() {
     el.removeAttribute("aria-invalid");
   });
   const d = defaults();
-  $("hint-rework").textContent = `SMT2020 range 0.5% to 2%. Data: ${pct(d.reworkProb, 2)}${reworkStep ? ` at ${reworkStep.name}` : ""}.`;
-  $("hint-A").textContent = `Data: ${(base.A * 100).toFixed(1)}%. Changes how often breakdowns and maintenance happen.`;
-  $("hint-ca").textContent = `Assumed ${fmt(inputs.caSq)} (random arrivals). Higher means more bunched arrivals.`;
+  $("hint-rework").textContent = `Data ${pct(d.reworkProb, 2)}`;
+  $("hint-A").textContent = `Data ${(base.A * 100).toFixed(1)}% · scales breakdown and PM frequency`;
+  $("hint-ca").textContent = `Assumed ${fmt(inputs.caSq)}`;
 }
 
 function onInput(e) {
@@ -439,33 +447,33 @@ function renderCosts() {
 
   const changed = !atDefaults();
   $("cost-settings").innerHTML = changed
-    ? `<strong>Using your Explore settings</strong>, not the data as given. <a href="#explore">Change them on Explore</a>, or use Reset there to return to the validated numbers.`
-    : `<strong>Using the data as given</strong>. Change the sliders or the cost of waiting on <a href="#explore">Explore</a> and this page updates.`;
+    ? `Your Explore inputs · <a href="#explore">change or reset</a>`
+    : `Data as given · <a href="#explore">change on Explore</a>`;
   $("cost-settings").classList.toggle("changed", changed);
 
   $("cost-answer").innerHTML = !r.stable
-    ? `At these settings the steppers are over capacity, so the queue and its cost grow without limit.`
+    ? `Over capacity: the queue and its cost grow without limit.`
     : c$ == null
-      ? `On average about <strong>${fmt(r.Lq, 3)} lots</strong> are waiting at ${inputs.toolGroup}. Enter the cost of waiting on <a href="#explore">Explore</a> to see what that costs.`
-      : `On average about <strong>${fmt(r.Lq, 3)} lots</strong> are waiting at ${inputs.toolGroup}. At ${money(c$)} per lot-hour, that waiting costs about <strong>${money(weekly)} a week</strong> (${money(Calc.annualWaitCost(r, c$))} a year) in holding cost.`;
+      ? `<strong>${fmt(r.Lq, 3)} lots</strong> in queue. Enter a cost of waiting on <a href="#explore">Explore</a>.`
+      : `<strong>${fmt(r.Lq, 3)} lots</strong> in queue at ${money(c$)}/lot-h: <strong>${money(weekly)} a week</strong>, ${money(Calc.annualWaitCost(r, c$))} a year in holding cost.`;
 
   $("cost-worked").innerHTML = r.stable && c$ != null ? `
     <ol class="worked-steps">
-      <li><span>Lots waiting, from Little’s Law</span>
+      <li><span>WIP in queue (Little’s Law)</span>
         <code>L<sub>q</sub> = λ × W<sub>q</sub> = ${fmt(r.lambda, 6)} visits/min × ${fmt(r.Wq, 6)} min = ${fmt(r.Lq, 6)} lots</code></li>
       <li><span>Cost of waiting per lot-hour</span>
         <code>${isBaseline
           ? `25 wafers × ${money(wait.parts.base.waferCost)} × ${pct(wait.parts.base.carryingRate, 2)} ÷ 8,760 h = ${money(c$)} (Isabella’s baseline)`
           : `${money(c$)}, entered on Explore (baseline ${money(wait.value)})`}</code></li>
-      <li><span>Weekly delay cost</span>
+      <li><span>Delay cost / week</span>
         <code>${fmt(r.Lq, 6)} lots × ${HPW} h × ${money(c$)} = ${money(weekly)}</code></li>
-      <li><span>Yearly delay cost</span>
+      <li><span>Delay cost / year</span>
         <code>${fmt(r.Lq, 6)} lots × ${money(c$)} × ${Calc.HOURS_PER_YEAR.toLocaleString("en-US")} h = ${money(Calc.annualWaitCost(r, c$))}</code></li>
     </ol>` : "";
 
   const cases = [
     ["28nm wafer, 20% carrying", wait.low],
-    ["28nm wafer, 25% (base)", wait.value],
+    ["28nm wafer, 25% carrying (baseline)", wait.value],
     ["28nm wafer, 30% carrying", Calc.carryingCostPerLotHour(25, wait.parts.low.waferCost, wait.parts.high.carryingRate)],
     ["Advanced wafer, 20% carrying", Calc.carryingCostPerLotHour(25, wait.parts.high.waferCost, wait.parts.low.carryingRate)],
     ["Advanced wafer, 30% carrying", wait.high],
@@ -474,11 +482,11 @@ function renderCosts() {
   cases.sort((x, y) => x[1] - y[1]);
   $("cost-range").innerHTML = `
     <table>
-      <thead><tr><th>Cost of waiting</th><th class="num">$ per lot-hour</th><th class="num">Weekly delay cost</th><th class="num">Yearly delay cost</th></tr></thead>
+      <thead><tr><th>Cost of waiting</th><th class="num">$ per lot-hour</th><th class="num">Per week</th><th class="num">Per year</th></tr></thead>
       <tbody>${cases.map(([label, c]) => {
         const w = Calc.weeklyWaitCost(r, c);
         const inUse = c$ != null && Math.abs(c - c$) < 0.005;
-        return `<tr${inUse ? ' class="in-use"' : ""}><td>${label}${inUse ? ' <span class="tag">in use</span>' : ""}</td><td class="num">${money(c)}</td><td class="num">${money(w)}</td><td class="num">${money(Calc.annualWaitCost(r, c))}</td></tr>`;
+        return `<tr${inUse ? ' class="in-use"' : ""}><td>${label}${inUse ? ' <span class="in-use-label">in use</span>' : ""}</td><td class="num">${money(c)}</td><td class="num">${money(w)}</td><td class="num">${money(Calc.annualWaitCost(r, c))}</td></tr>`;
       }).join("")}</tbody>
     </table>`;
 
@@ -507,11 +515,11 @@ function renderScenarios() {
   const atTarget = target != null && fromRate <= target + 1e-12;
 
   const list = [
-    { key: "current", title: "Current state", change: `${state.m} steppers, ${pct(fromRate, 2)} rework at ${stepName}`, whatIf: sliderSettings() },
-    { key: "add", title: "Add a stepper", change: `${state.m} → ${mNew} steppers, rework stays at ${pct(fromRate, 2)}`,
+    { key: "current", title: "Current state", change: `${state.m} steppers · ${pct(fromRate, 2)} rework`, whatIf: sliderSettings() },
+    { key: "add", title: "Add a stepper", change: `${state.m} → ${mNew} steppers · ${pct(fromRate, 2)} rework`,
       whatIf: sliderSettings({ m: mNew }), cost: state.stepperCost, op: inputs.costs.extraStepper.annualOperatingCost },
   ];
-  if (target != null) list.push({ key: "cut", title: "Cut the rework rate", change: `${stepName}: ${pct(fromRate, 2)} → ${pct(target, 2)}, ${state.m} steppers`,
+  if (target != null) list.push({ key: "cut", title: "Cut rework", change: `${state.m} steppers · ${stepName} ${pct(fromRate, 2)} → ${pct(target, 2)}`,
     whatIf: sliderSettings({ reworkProb: target }), cost: state.projectCost, op: inputs.costs.reworkProject.annualOperatingCost });
   const runs = Calc.runScenarios(inputs, list);
   const cur = runs[0].result;
@@ -523,22 +531,22 @@ function renderScenarios() {
     const yearly = Calc.annualWaitCost(r, state.waitCost);
     const rows = [
       ["Utilization", pct(r.rho)],
-      ["Wait in queue", `${hfmt(r.Wq)} h`],
-      ["Lots waiting (L<sub>q</sub>)", r.stable ? fmt(r.Lq, 4) : "∞"],
-      ["Cost of the wait, per year", money(yearly)],
+      ["Queue time", `${hfmt(r.Wq)} h`],
+      ["WIP in queue", r.stable ? fmt(r.Lq, 4) : "∞"],
+      ["Queue cost / yr", money(yearly)],
     ];
     let worked = r.stable && state.waitCost != null
-      ? `Cost of the wait = L<sub>q</sub> ${fmt(r.Lq, 4)} × ${money(state.waitCost)} × ${Calc.HOURS_PER_YEAR.toLocaleString("en-US")} h` : "";
+      ? `${fmt(r.Lq, 4)} lots × ${money(state.waitCost)} × ${Calc.HOURS_PER_YEAR.toLocaleString("en-US")} h` : "";
     if (sc.key !== "current") {
       const e = (sc.key === "cut" && atTarget) ? { status: "at-target" } : Calc.fixEconomics(cur, r, sc.cost, state.waitCost, 5, sc.op || 0);
       sc.econ = e;
-      const paybackLabel = sc.op == null ? "Payback (before operating costs)" : "Payback";
+      const paybackLabel = sc.op == null ? "Payback, pre-opex" : "Payback";
       rows.push(
-        ["Savings per year", e.status === "ok" ? money(e.annualSavings) : "—"],
-        ["Cost of fix (one-time)", money(sc.cost)],
+        ["Savings / yr", e.status === "ok" ? money(e.annualSavings) : "—"],
+        ["One-time cost", money(sc.cost)],
         [paybackLabel, e.status === "ok" ? yearsFmt(e.paybackYears) : `<span class="reason">${why[e.status]}</span>`],
       );
-      if (e.status === "ok") worked += `<br>Payback = ${money(sc.cost)} ÷ ${money(e.annualSavings)} per year`;
+      if (e.status === "ok") worked += `<br>${money(sc.cost)} ÷ ${money(e.annualSavings)}/yr`;
     }
     return { ...sc, rows, worked };
   };
@@ -554,7 +562,7 @@ function renderScenarios() {
       <p class="pending-note">Waiting on Peixuan’s target rework rate for ${stepName}. Once it is entered in <code>js/app.js</code>, this column fills in.</p>
     </article>` : `
     <article class="scenario${best === sc.key ? " best" : ""}">
-      ${best === sc.key ? `<p class="badge">Pays back sooner</p>` : ""}
+      ${best === sc.key ? `<p class="pick">Pays back sooner</p>` : ""}
       <h3>${sc.title}</h3><p class="change">${sc.change}</p>
       <dl>${sc.rows.map(([k, v]) => `<div><dt>${k}</dt><dd>${v}</dd></div>`).join("")}</dl>
       ${sc.worked ? `<p class="worked">${sc.worked}</p>` : ""}
@@ -563,22 +571,22 @@ function renderScenarios() {
   // Which settings these are: the data as given, or changed on Explore.
   const changed = !atDefaults() || state.stepperCost !== defaults().stepperCost || state.projectCost !== defaults().projectCost;
   $("scenario-settings").innerHTML = changed
-    ? `<strong>Using your Explore settings</strong>, not the data as given. <a href="#explore">Change them on Explore</a>, or use Reset there to return to the validated numbers.`
-    : `<strong>Using the data as given</strong> (the validated hand calculation). Change the sliders or costs on <a href="#explore">Explore</a> and these scenarios update.`;
+    ? `Your Explore inputs · <a href="#explore">change or reset</a>`
+    : `Data as given · <a href="#explore">change on Explore</a>`;
   $("scenario-settings").classList.toggle("changed", changed);
 
   const add = cards.find(c => c.key === "add"), cut = cards.find(c => c.key === "cut");
   let answer;
   if (!cur.stable) {
-    answer = `At these settings the ${state.m} steppers are over capacity (${pct(cur.rho)} busy), so the line grows without limit. ${add.result.stable ? `Adding a ${ordinal(mNew)} stepper brings it back under capacity.` : "Adding one stepper isn’t enough."}`;
+    answer = `${state.m} steppers at ${pct(cur.rho)} utilization: over capacity. ${add.result.stable ? `A ${ordinal(mNew)} stepper brings it back under.` : "One more stepper isn’t enough."}`;
   } else {
     answer = add.econ.status === "ok"
-      ? `Adding a ${ordinal(mNew)} stepper cuts the wait from <strong>${hfmt(cur.Wq)} to ${hfmt(add.result.Wq)} hours</strong> and saves ${money(add.econ.annualSavings)} a year in holding cost, so its ${money(state.stepperCost)} price pays back in <strong>${yearsFmt(add.econ.paybackYears)}</strong>.`
-      : `Adding a ${ordinal(mNew)} stepper cuts the wait from <strong>${hfmt(cur.Wq)} to ${hfmt(add.result.Wq)} hours</strong>.`;
+      ? `A ${ordinal(mNew)} stepper cuts queue time from ${hfmt(cur.Wq)} to <strong>${hfmt(add.result.Wq)} h</strong> but pays back in <strong>${yearsFmt(add.econ.paybackYears)}</strong>.`
+      : `A ${ordinal(mNew)} stepper cuts queue time from ${hfmt(cur.Wq)} to <strong>${hfmt(add.result.Wq)} h</strong>.`;
     if (cut?.pending) answer += ` The rework scenario is waiting on Peixuan’s target rate.`;
-    else if (atTarget) answer += ` Rework is already at or below the ${pct(target, 2)} target at these settings, so cutting it saves nothing more.`;
-    else if (cut?.econ.status === "ok") answer += ` Cutting rework to ${pct(target, 2)} cuts the wait to ${hfmt(cut.result.Wq)} hours and pays back in <strong>${yearsFmt(cut.econ.paybackYears)}</strong>.`;
-    else if (cut) answer += ` Cutting rework to ${pct(target, 2)} cuts the wait to ${hfmt(cut.result.Wq)} hours.`;
+    else if (atTarget) answer += ` Rework is already at the ${pct(target, 2)} target.`;
+    else if (cut?.econ.status === "ok") answer += ` Cutting rework to ${pct(target, 2)} only gets it to ${hfmt(cut.result.Wq)} h, but pays back in <strong>${yearsFmt(cut.econ.paybackYears)}</strong>.`;
+    else if (cut) answer += ` Cutting rework to ${pct(target, 2)} gets it to ${hfmt(cut.result.Wq)} h.`;
   }
   $("scenario-answer").innerHTML = answer;
 
@@ -587,7 +595,7 @@ function renderScenarios() {
   if (inputs.costs.extraStepper.annualOperatingCost == null) missing.push("the yearly operating cost of a sixth stepper");
   if (inputs.costs.reworkProject.annualOperatingCost == null) missing.push("any yearly cost of keeping the rework improvement running");
   $("scenario-missing").innerHTML = missing.length
-    ? `<strong>Still needed:</strong> ${missing.join("; ")}. Payback uses holding-cost savings only, before operating costs, until those are entered.`
+    ? `<strong>Still needed:</strong> ${missing.join("; ")}. Paybacks are pre-opex until then.`
     : "";
 }
 

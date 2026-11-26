@@ -298,6 +298,7 @@ function renderExplore() {
     item("Cycle time", hfmt(cur.cycleTime), "h", was(`${hfmt(base.cycleTime)} h`)) +
     item("WIP in queue", wipFmt(cur.Lq), "lots", was(`${wipFmt(base.Lq)} lots`)) +
     item("Holding cost / yr", money(yearly), "", was(money(yearlyBase)));
+  fitReadout();
 
   // Chart: the curve for these settings, a moving dot, and a hollow dot for the data as given.
   $("chart-meta").textContent = `${inputs.toolGroup} · m = ${state.m} · ${state.m === 1 ? "Kingman G/G/1" : `Sakasegawa G/G/${state.m}`}`;
@@ -378,6 +379,19 @@ function renderStatus() {
       ? `<span class="status-key modified">Modified</span> ${diffs.join(" · ")}`
       : `<span class="status-key">Inputs</span> Baseline (SMT2020 data)`;
   $("status-reset").hidden = !modified;
+}
+
+// Shrinks the headline numbers together, only as far as the longest one on screen needs to fit its cell.
+function fitReadout() {
+  const box = $("readout"), dds = [...box.querySelectorAll("dd")];
+  const rem = parseFloat(getComputedStyle(document.documentElement).fontSize);
+  let size = 2.2 * rem;
+  const min = 1.1 * rem;
+  box.style.setProperty("--readout-size", `${size}px`);
+  while (size > min && dds.some(d => d.scrollWidth > d.clientWidth + 1)) {
+    size -= 1;
+    box.style.setProperty("--readout-size", `${size}px`);
+  }
 }
 
 function syncControls() {
@@ -731,6 +745,12 @@ document.addEventListener("DOMContentLoaded", () => {
   $("reset").addEventListener("click", resetAll);
   $("status-reset").addEventListener("click", resetAll);
   safeRenderExplore();   // fills Explore and Scenarios, whichever tab the page opens on
+  // Refit the headline numbers when the strip changes size (window resize, browser zoom) and once the fonts load.
+  if (window.ResizeObserver) {
+    let raf = 0;
+    new ResizeObserver(() => { cancelAnimationFrame(raf); raf = requestAnimationFrame(fitReadout); }).observe($("readout"));
+  }
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(fitReadout);
 
   showPage();
   if (typeof runSelfChecks === "function") runSelfChecks();

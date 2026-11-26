@@ -1,6 +1,6 @@
 /*
   calc.js — Phase 1: capacity calculations for one lithography tool group (G/G/m).
-            Phase 2: financial calculations (delay cost, payback, ROI).
+            Phase 2: financial calculations (holding cost, payback, ROI).
             Module 3: scenarios (current state, add a stepper, cut the rework rate).
             Module 4: slider settings (applyWhatIf) for the interactive page.
   Every time is in MINUTES (to match the hand-calc). Rates are per minute.
@@ -254,18 +254,10 @@ const Calc = (() => {
   }
 
   // The SMT2020 fab runs around the clock, so a week is 168 hours.
-  const HOURS_PER_WEEK = 168;
   const HOURS_PER_YEAR = 8760;   // H in the Detailed Calculations: 365 x 24
 
-  // Weekly cost of waiting: average lots waiting (Lq) x hours per week x $ per lot-hour.
-  // null when the cost isn't entered yet; Infinity when the queue is unstable.
-  function weeklyWaitCost(result, costPerLotHour) {
-    if (costPerLotHour == null) return null;
-    if (!result.stable) return Infinity;
-    return result.Lq * HOURS_PER_WEEK * costPerLotHour;
-  }
 
-  // Yearly cost of waiting: C_waiting,year = Lq x h x H (Detailed Calculations).
+  // Holding cost per year = WIP in queue (Lq) x holding cost rate (h) x H hours (Detailed Calculations).
   function annualWaitCost(result, costPerLotHour) {
     if (costPerLotHour == null) return null;
     if (!result.stable) return Infinity;
@@ -297,7 +289,7 @@ const Calc = (() => {
     return out;
   }
 
-  // Break-even cost of waiting: the $ per lot-hour at which a fix pays for itself in exactly horizonYears.
+  // Break-even holding cost rate: the $/lot-h at which a fix pays for itself in exactly horizonYears.
   //   = cost of the fix / (drop in Lq x 8,760 h x horizonYears). null if it can't be worked out.
   function breakEvenWaitCost(current, fixed, fixCost, horizonYears) {
     if (!current.stable || !fixed.stable || fixCost == null) return null;
@@ -342,8 +334,8 @@ const Calc = (() => {
   return {
     productReleaseRate, arrivalRates, lotTime, jobMix, stepSummary, downtimeScv,
     effectiveTime, utilization, sakasegawaWq, validate, run,
-    applyWhatIf, runScenarios, HOURS_PER_WEEK, HOURS_PER_YEAR, carryingCostPerLotHour,
-    weeklyWaitCost, annualWaitCost, fixEconomics,
+    applyWhatIf, runScenarios, HOURS_PER_YEAR, carryingCostPerLotHour,
+    annualWaitCost, fixEconomics,
     breakEvenWaitCost, LITHO_FE_98,
   };
 })();

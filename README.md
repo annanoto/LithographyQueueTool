@@ -8,56 +8,60 @@ A web tool that estimates how long lots wait at a lithography tool group, what t
 
 Team: Anna (build and demo), Peixuan (model and technical speech), Isabella (costs and marketing speech).
 
+## Quick start
+
+```bash
+git clone https://github.com/annanoto/LithographyQueueTool.git && cd LithographyQueueTool
+node js/tests.js                 # 27 unit tests; exit code 0 means all pass
+python3 -m http.server 8000      # then open http://localhost:8000
+```
+
+Requires Node.js for the tests and Python 3 for the local server. No install or build step; opening `index.html` directly in a browser also works.
+
 ## Status
 
-- **Phase 1, capacity calculations:** done. Effective processing time and variability, utilization, and queue wait, running on the Litho_FE_98 data and matching the hand calculation.
-- **Phase 2, financial calculations:** done. Delay cost from Little’s Law (Lq = λ × Wq), payback period, and ROI.
-- **Module 3, scenarios:** done. Current state, add a stepper, and cut the rework rate, side by side.
-- **Module 4, interactive inputs:** done. Sliders and cost boxes that update every result instantly.
-- **Still needed:** yearly operating costs for a 6th stepper and for the rework project (or confirmation that they are $0). Until then, payback is shown "before operating costs."
+- **Phase 1, capacity calculations:** done. Effective processing time and variability, utilization, and queue time, running on the Litho_FE_98 data and matching the hand calculation.
+- **Phase 2, financial calculations:** done. Holding cost from Little’s Law (WIP in queue Lq = λ × Wq), payback period, and ROI.
+- **Module 3, scenarios:** done. No change, add a stepper, and cut the rework rate, side by side.
+- **Module 4, interactive inputs:** done. Sliders and cost fields that update every result instantly.
+- **Still needed:** yearly operating costs for a 6th stepper and for the rework project (or confirmation that they are $0). Until then, payback is shown "pre-opex."
+
+## Vocabulary
+
+One name per concept, used everywhere on the site:
+
+| Term | Meaning |
+|---|---|
+| **Baseline** | The SMT2020 data as given, the validated hand calculation |
+| **Queue time** (Wq) | Average time a lot waits before processing, in hours |
+| **Cycle time** (CT) | Queue time + effective processing time |
+| **WIP in queue** (Lq) | Average lots waiting, from Little’s Law |
+| **Holding cost rate** | $ per lot-hour of waiting (inventory carrying cost) |
+| **Holding cost** | WIP in queue × holding cost rate × 8,760 h, always per year |
 
 ## Pages
 
-### Explore
-The main page, built for trying different values.
+A status line under the tabs shows whether the inputs are at the **Baseline** or modified (listing each change), with a **Reset to baseline** link.
 
-- **Sliders** (ranges confirmed by Peixuan): rework rate (0.5%–2%), number of steppers (1–8), availability (70%–99%), and arrival variability cₐ² (0–3). Each starts at the data’s value.
-- **Cost boxes:** cost of waiting, cost of an extra stepper, and cost of the rework project, prefilled with Isabella’s baselines.
-- **Reset to data** puts every input back.
-- **Results that update instantly:** a one-sentence answer and five headline numbers (utilization, queue time, cycle time, WIP in queue, queue cost per week). Once an input changes, each number also shows its "data as given" value.
-- **Queue time vs. utilization chart:** the gold wafer marker moves with the inputs; a hollow dot marks "today" (the data as given).
-- **Payback:** payback for each fix, starting from the current inputs.
-- **Calculation chain:** each equation, from arrival rate to WIP in queue, with live values.
+### Explore
+- **Inputs:** sliders for rework rate (0.5%–2%), steppers (1–8), availability (70%–99%), and arrival variability cₐ² (0–3), each with its range at the ends and a tick at the baseline value. Cost fields for the holding cost rate ($/lot-h), an extra stepper ($M), and the rework project ($K).
+- **Decision banner:** a Baseline / What-if / Capacity alert badge and one insight, such as how far utilization is above the 75–90% target band.
+- **Instrument strip:** utilization, queue time, cycle time, WIP in queue, and holding cost per year.
+- **Payback:** payback for each fix from the current inputs; the fix that pays back sooner is tagged.
+- **Queue time vs. utilization:** the curve for the current inputs, the 75–90% target band, a gold dot for the inputs and a hollow dot for the baseline.
+- **Calculation chain:** each equation from arrival rate to WIP in queue, with live values.
 
 ### Scenarios
-The three scenarios side by side, each showing utilization, wait in queue, lots waiting, yearly cost of the wait, and (for the fixes) yearly savings, cost of the fix, and payback.
-
-- **Current state:** the Explore settings. At the data as given, this is the validated hand calculation.
-- **Add a stepper:** one more stepper (5 → 6 at the data as given), rework unchanged.
-- **Cut the rework rate:** 072_Litho rework cut to 0.5% (Peixuan’s target, the bottom of the SMT2020 range), steppers unchanged.
-- The page follows the Explore inputs, and a note at the top says whether it is using the data as given or changed settings.
-- A **"Pays back sooner"** badge goes to whichever fix has the shorter payback. It appears only when both fixes have a payback to compare.
-- Each card shows its worked numbers (e.g., Payback = $75,000 ÷ $16,996 per year).
+A two-line conclusion and one comparison table: metrics as rows (rework rate, utilization, queue time, WIP in queue, holding cost per year, savings per year, one-time cost, payback), and **No change**, **Add a stepper**, and **Cut rework** as columns, with the change vs. No change under each value. The column that pays back sooner is tagged; hover a payback to see its numbers. Follows the Explore inputs.
 
 ### Costs
-The delay cost of the current queue. It follows the Explore inputs, and a note at the top says whether it is using the data as given or changed settings.
-
-- **How the delay cost is calculated:** Lq from Little’s Law, cost per lot-hour, and weekly and yearly delay cost, with the numbers shown.
-- **Delay cost across the range of waiting costs:** from 28nm to advanced-node wafer values, since no published cost per lot-hour exists. The row matching the cost of waiting in use is highlighted.
-- **Cost assumptions:** each baseline, its range, and its source. These stay fixed.
+Holding cost of the queue, following the Explore inputs: the worked calculation (WIP in queue, holding cost rate, holding cost per year), the sensitivity to the holding cost rate across the sourced range ($1.71–$14.55/lot-h), and the cost assumptions with sources.
 
 ### Data
-The inputs, always using the data as given (the sliders don’t change this page).
-
-- **Lithography steps at this tool group:** one row for each step and lot type, with release interval, wafers, lot time, rework, visit rate, and share.
-- **Breakdowns and scheduled maintenance:** how often each happens, how long it lasts, and its share of time down.
-- **Data to collect:** every input with its value and source; anything missing is marked in red.
+Baseline only: the lithography steps, breakdowns and maintenance, and every input with its value and source.
 
 ### Validation
-Always uses the data as given, so the comparison with the hand calculation stays valid.
-
-- **Site vs. hand calc:** all 19 values from Peixuan’s hand calculation next to the site’s values, with the difference and a match column.
-- **Unit tests:** 27 tests against cases with known answers, the hand calculation, and the financial formulas.
+Baseline only, so the comparison stays valid: all 19 hand-calc values next to the site’s values, seven sanity checks against theory, the assumptions and limits, and the 27 unit tests.
 
 ## Baseline costs (Isabella)
 
@@ -67,7 +71,7 @@ Always uses the data as given, so the comparison with the hand calculation stays
 | Extra stepper | $34M | Dry ArF, the most verified and relevant cost |
 | Rework-reduction project | $75,000 (one-time) | The most supported value found |
 
-The cost of waiting is holding cost only. It does not include lost output at a bottleneck, delayed revenue, or yield effects.
+Holding cost only: it does not include lost output at a bottleneck, delayed revenue, or yield effects.
 
 ## Model notes
 
@@ -87,7 +91,7 @@ The cost of waiting is holding cost only. It does not include lost output at a b
 
 ## Units
 
-All times are in minutes and all rates per minute, to match the hand calculation. The site converts waits to hours for display. Yearly costs use 8,760 hours (365 × 24); weekly costs use 168 hours. Percentages are decimals in the code (1.7% = 0.017, 87.7% = 0.877).
+All times are in minutes and all rates per minute, to match the hand calculation. The site converts queue and cycle time to hours for display. Holding cost is always per year, using 8,760 hours (365 × 24). Percentages are decimals in the code (1.7% = 0.017, 87.7% = 0.877).
 
 ## Sources
 

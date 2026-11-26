@@ -337,6 +337,15 @@ h2 .meta { margin-left: 0.6rem; font-family: "IBM Plex Mono", monospace; font-si
 
 footer .version { font-family: "IBM Plex Mono", monospace; font-size: 0.78rem; }
 
+/* ---------- Headline numbers fit their cell ---------- */
+/* app.js (fitReadout) shrinks all five numbers together, only as far as the longest one on screen needs,
+   so values such as $2,543,804 never get cut off at any window size or zoom. */
+.readout > div { container-type: inline-size; }
+.results .readout > div { padding-left: 0.8rem; padding-right: 0.8rem; }
+.results .readout dd { font-size: var(--readout-size, 2.2rem); white-space: nowrap; letter-spacing: -0.02em; }
+/* In a very narrow cell (phones at high zoom), the unit moves under the number instead of overflowing. */
+@container (max-width: 8rem) { .results .readout dd small { display: block; margin-left: 0; } }
+
 /* ---------- Phone layout fix ---------- */
 /* Grid and flex children default to the width of their widest content, so one wide table widened the
    whole page on phones. Letting them shrink keeps each page to the screen; wide tables scroll inside their panel. */

@@ -39,7 +39,7 @@ function checks() {
   // 3. Utilization: wait more than doubles from rho 0.80 -> 0.90 and again 0.90 -> 0.95.
   const atRho = rho => CalcRef.run(baseCase({ products: { P: lots(60 / rho) } })).Wq;
   const w80 = atRho(0.80), w90 = atRho(0.90), w95 = atRho(0.95);
-  results.push({ name: "Wait more than doubles from 80% → 90% → 95% utilization", pass: w90 > 2 * w80 && w95 > 2 * w90 });
+  results.push({ name: "Queue time more than doubles from 80% → 90% → 95% utilization", pass: w90 > 2 * w80 && w95 > 2 * w90 });
 
   // 4. Release rate: one lot per event, summed over lot types (1/60 + 1/120 + 1/240 = 7/240 per min).
   const threeTypes = [60, 120, 240].map(x => ({ releaseIntervalMin: x, wafersPerLot: 1 }));
@@ -98,7 +98,7 @@ function checks() {
 
   // 12. More tools: m = 2 leaves the tool-group arrival rate unchanged but halves utilization.
   const one = CalcRef.run(baseCase()), two = CalcRef.run(baseCase({ m: 2 }));
-  results.push({ name: "Adding a tool (m = 2): same λ, half the utilization, shorter wait",
+  results.push({ name: "Adding a tool (m = 2): same λ, half the utilization, shorter queue time",
     pass: close(two.lambda, one.lambda) && close(two.rho, one.rho / 2) && two.Wq < one.Wq });
 
   // 13. Bad inputs are rejected with a message (rework typed as 1.7 instead of 0.017).
@@ -119,9 +119,9 @@ function checks() {
   results.push({ name: "Litho_FE_98 matches hand-calc (λ, λ65, t0, c0², A, K, te, ce², ρ, Wq, CT)"
     + (misses.length ? ` — off: ${misses.join(", ")}` : ""), pass: misses.length === 0 });
 
-  // 17. Weekly cost of waiting = Lq x 168 h x $ per lot-hour.
-  results.push({ name: "Weekly cost = Lq × 168 h × $ per lot-hour",
-    pass: close(CalcRef.weeklyWaitCost({ stable: true, Lq: 2 }, 50), 2 * 168 * 50) && CalcRef.weeklyWaitCost({ stable: true, Lq: 2 }, null) === null });
+  // 17. Holding cost per year: null with no rate, Infinity when the queue is unstable.
+  results.push({ name: "Holding cost per year: none until a rate is entered, ∞ when over capacity",
+    pass: CalcRef.annualWaitCost({ stable: true, Lq: 2 }, null) === null && CalcRef.annualWaitCost({ stable: false, Lq: Infinity }, 2) === Infinity });
 
   // 18. Payback and ROI (yearly): Lq 10 -> 4 at $100/lot-h saves 6 x 100 x 8,760 = $5,256,000/yr;
   //     a $10,512,000 fix pays back in 2 years, and over 5 years ROI = (5,256,000 x 5 - 10,512,000) / 10,512,000 = 1.5.
@@ -134,22 +134,22 @@ function checks() {
   results.push({ name: "Operating cost reduces net savings: $5.256M − $0.256M → payback 2 years",
     pass: close(net.annualSavings, 5000000, 1e-6) && close(net.paybackYears, 2) });
 
-  // 18c. Yearly delay cost = Lq x h x 8,760 h (Detailed Calculations: 19.958 lots x h x 8,760).
-  results.push({ name: "Yearly delay cost = Lq × $ per lot-hour × 8,760 h",
+  // 18c. Holding cost per year = Lq x holding cost rate x 8,760 h (Detailed Calculations).
+  results.push({ name: "Holding cost per year = WIP in queue × holding cost rate × 8,760 h",
     pass: close(CalcRef.annualWaitCost({ stable: true, Lq: 2 }, 50), 2 * 50 * 8760) });
 
   // 19. An over-capacity current state is reported, not turned into a misleading payback.
   const bad = CalcRef.fixEconomics({ stable: false, Lq: Infinity }, { stable: true, Lq: 4 }, 1000, 100);
-  results.push({ name: "Over-capacity current state: no payback number, status says why",
+  results.push({ name: "Over capacity before the fix: no payback number, status says why",
     pass: bad.status === "current-unstable" && bad.paybackYears === null });
 
   // 20. Carrying cost: 25 wafers x $3,000 x 20% / 8,760 h = $1.712 per lot-hour (cost assumptions doc).
-  results.push({ name: "Carrying cost: 25 × $3,000 × 20% ÷ 8,760 h = $1.71 per lot-hour",
+  results.push({ name: "Holding cost rate: 25 × $3,000 × 20% ÷ 8,760 h = $1.71/lot-h",
     pass: close(CalcRef.carryingCostPerLotHour(25, 3000, 0.20), 75000 * 0.2 / 8760) && rel(CalcRef.carryingCostPerLotHour(25, 3000, 0.20), 1.712, 1e-3) });
 
   // 21. Break-even: Lq 10 -> 4 (drop of 6) over 1 year; a $525,600 fix breaks even at
   //     525600 / (6 x 8,760 x 1) = $10 per lot-hour.
-  results.push({ name: "Break-even cost of waiting: $525,600 fix, ΔLq = 6, 1 year → $10 per lot-hour",
+  results.push({ name: "Break-even holding cost rate: $525,600 fix, ΔLq = 6, 1 year → $10/lot-h",
     pass: close(CalcRef.breakEvenWaitCost({ stable: true, Lq: 10 }, { stable: true, Lq: 4 }, 525600, 1), 10) });
 
   // 22. Scenarios: no settings reproduces the hand calc; rework 0% makes Step 65 visits equal Step 72's;

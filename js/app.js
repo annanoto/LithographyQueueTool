@@ -1,7 +1,7 @@
 /*
   app.js — holds the inputs, runs the capacity (Phase 1) and financial (Phase 2) calculations,
   the scenarios (Module 3) and the sliders (Module 4), and shows the results
-  (pages: Explore, Scenarios, Costs, Data, Check against hand calc).
+  (pages: Explore, Scenarios, Costs, Data, Validation).
   All times in MINUTES, rates and percentages as decimals (1.7% = 0.017).
   calc.js works in minutes (to match the hand-calc); the readout and chart convert waits to hours.
 
@@ -15,7 +15,7 @@
   Filled with Litho_FE_98 from the Dataset and Calculations docs, and costs from the Cost Assumptions doc.
 */
 const inputs = {
-  toolGroup: "Litho_FE_98",   // chosen tool group from data
+  toolGroup: "Litho_FE_98",   // PLACEHOLDER: tool group Peixuan chooses
   m: 5,                       // parallel tools in the group (Toolgroups, row 66)
   loadMin: 1,                 // loading time per lot (Toolgroups, row 66)
   unloadMin: 1,               // unloading time per lot (Toolgroups, row 66)
@@ -57,7 +57,7 @@ const inputs = {
   //    Bracketed numbers are that doc's source list.
   costs: {
     waitingPerLotHour: {
-      label: "Cost of waiting", unit: "$ per lot-hour",
+      label: "Holding cost rate", unit: "$/lot-h",
       // Derived, not published: wafers per lot x wafer cost x annual carrying rate / 8,760 h.
       // value, low and high ($ per lot-hour) are calculated from these parts when the page loads.
       parts: {
@@ -65,7 +65,7 @@ const inputs = {
         low:  { waferCost: 3000,  carryingRate: 0.20 },  // 28nm, 20%  -> $1.71
         high: { waferCost: 17000, carryingRate: 0.30 },  // advanced-node wafer [8], 30% -> $14.55
       },
-      source: "Baseline $2.14 chosen by Isabella: 25 wafers × $3,000 (28nm [7]) × 25% carrying rate [9], [10] ÷ 8,760 h. Range uses $3,000–$17,000 wafers [7], [8] and 20–30% carrying.",
+      source: "Baseline $2.14 chosen by Isabella: 25 wafers × $3,000 (28nm [7]) × 25% annual holding rate (inventory carrying cost) [9], [10] ÷ 8,760 h. Range uses $3,000–$17,000 wafers [7], [8] and 20–30% holding rates.",
     },
     // Baselines chosen by Isabella (cost baselines and reasoning, Nov 2026).
     extraStepper: {
@@ -94,7 +94,7 @@ const inputs = {
 };
 
 /* ---------- Derived cost values ---------- */
-// The cost of waiting is calculated from wafer cost and carrying rate, so it is filled in here.
+// The holding cost rate is calculated from wafer cost and annual holding rate, so it is filled in here.
 (() => {
   const w = inputs.costs.waitingPerLotHour;
   const calc = c => Calc.carryingCostPerLotHour(inputs.products[Object.keys(inputs.products)[0]][0].wafersPerLot, c.waferCost, c.carryingRate);
@@ -106,7 +106,9 @@ const fmt = (x, digits = 4) =>
   Number.isFinite(x) ? Number(x.toPrecision(digits)).toString() : "∞";
 const pct = (x, digits = 3) => Number.isFinite(x) ? `${fmt(x * 100, digits)}%` : "∞";
 const hrs = min => min / 60;
-const hfmt = min => Number.isFinite(min) ? fmt(hrs(min), 3) : "∞";
+const hfmt = min => Number.isFinite(min) ? hrs(min).toFixed(2) : "∞";        // queue and cycle time: 2 decimals, in hours
+const p1 = x => Number.isFinite(x) ? `${(x * 100).toFixed(1)}%` : "∞";       // utilization, availability, rework: 1 decimal
+const wipFmt = x => Number.isFinite(x) ? x.toFixed(2) : "∞";                 // WIP in queue: 2 decimals
 const $ = id => document.getElementById(id);
 const moneyFmt = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 });
 const money = x => x == null ? "—" : !Number.isFinite(x) ? "∞" : Math.abs(x) < 100 ? `$${x.toFixed(2)}` : moneyFmt.format(x);
@@ -116,8 +118,16 @@ const ordinal = n => n + (["th", "st", "nd", "rd"][((n % 100) - 20) % 10] || ["t
 const reworkStep = inputs.steps.find(s => s.reworkProb != null);
 // The gold dot marks the current inputs on the chart and in its legend.
 const WAFER_KEY = `<span class="key-here"></span>`;
+// Labels for the ends of each slider and its data-value tick.
+const RANGE_FMT = {
+  reworkProb: x => `${(x * 100).toFixed(1)}%`,
+  m: x => `${x}`,
+  availability: x => `${Math.round(x * 100)}%`,
+  caSq: x => x.toFixed(1),
+};
+let currentPage = "explore";
 const PAGES = ["explore", "scenarios", "costs", "data", "check"];
-let base = null;   // the data as given: the validated hand-calc run
+let base = null;   // the baseline: SMT2020 data as given, the validated hand-calc run
 let state = null;  // slider and cost-box values on the Explore page
 
 /* ---------- Hand calculation (Calculations doc, Litho_FE_98) ---------- */
@@ -140,8 +150,8 @@ const HAND_CALC = [
   ["Effective processing time", "t<sub>e</sub>", 78.69219428, "min/visit", r => r.te],
   ["Effective variability", "c<sub>e</sub>²", 1.76380260, "", r => r.ceSq],
   ["Utilization", "ρ", 0.94341208, "", r => r.rho],
-  ["Average wait in queue", "W<sub>q</sub>", 332.94824720, "min", r => r.Wq],
-  ["Time at tool group (wait + processing)", "CT", 411.64044148, "min", r => r.cycleTime],
+  ["Queue time", "W<sub>q</sub>", 332.94824720, "min", r => r.Wq],
+  ["Cycle time (queue + processing)", "CT", 411.64044148, "min", r => r.cycleTime],
 ];
 const step = (r, n) => r.stepSummary.find(s => s.step === n);
 // The hand calc rounds to about 8 significant figures, so a relative difference under 1e-7 counts as a match.
@@ -210,7 +220,7 @@ function lineChart(o) {
         ${p.label.map((t, i) => `<tspan x="${tx}" dy="${i ? 20 : 0}">${t}</tspan>`).join("")}</text>`;
     }
     const drop = p.cls === "here" ? `<line class="here-line" x1="${px}" x2="${px}" y1="${py}" y2="${H - M.b}"/>` : "";
-    const dot = `<circle class="${p.cls}" cx="${px}" cy="${py}" r="${p.cls === "here" ? 9 : 7}"/>`;
+    const dot = `<circle class="${p.cls}" cx="${px}" cy="${py}" r="${p.cls === "here" ? 5.5 : 4.5}"/>`;
     return `${drop}${dot}${label}`;
   }).join("");
 
@@ -250,102 +260,149 @@ function renderExplore() {
   const cur = runWith();
   const changed = !atDefaults();
 
-  $("out-rework").textContent = pct(state.reworkProb, 2);
+  $("out-rework").textContent = p1(state.reworkProb);
   $("out-m").textContent = state.m;
   $("out-A").textContent = `${(state.availability * 100).toFixed(1)}%`;
   $("out-ca").textContent = state.caSq.toFixed(2);
   const d = defaults();
-  const costHint = (v, dv) => v == null ? "Enter a value" :
-    v === dv ? `${money(v)} · baseline` : `${money(v)} · baseline ${money(dv)}`;
+  const costHint = (v, dv) => v == null ? "Enter a value" : Math.abs(v - dv) < 1e-9 ? "Baseline" : `Baseline: ${money(dv)}`;
   $("hint-wait").textContent = costHint(state.waitCost, d.waitCost);
   $("hint-stepper").textContent = costHint(state.stepperCost, d.stepperCost);
   $("hint-project").textContent = costHint(state.projectCost, d.projectCost);
-  $("hint-m").textContent = cur.stable ? `Data ${inputs.m}` : `Data ${inputs.m} · over capacity`;
 
-  $("answer").innerHTML = cur.stable
-    ? `Lots wait <strong>${hfmt(cur.Wq)} h</strong> in queue for ${state.m} steppers running at <strong>${pct(cur.rho)}</strong> utilization. Cycle time at the tool group: ${hfmt(cur.cycleTime)} h.`
-    : `At ${pct(cur.rho)} utilization, ${state.m} stepper${state.m > 1 ? "s" : ""} can’t keep up: the queue grows without limit.`;
+  // Decision banner: a status badge plus something the headline numbers don't already say.
+  const badge = !cur.stable ? `<span class="label-tag bad">Capacity alert</span>`
+    : changed ? `<span class="label-tag">What-if</span>` : `<span class="label-tag">Baseline</span>`;
+  let insight;
+  if (!cur.stable) {
+    insight = `At ${p1(cur.rho)} utilization, ${state.m} stepper${state.m > 1 ? "s" : ""} can’t keep up: the queue grows without limit. Add capacity or raise availability.`;
+  } else if (cur.rho > 0.90) {
+    const at85 = Calc.sakasegawaWq(state.caSq, cur.ceSq, 0.85, cur.te, state.m);
+    insight = `<strong>${(cur.rho * 100 - 90).toFixed(1)} points above</strong> the 75–90% target band: queue time is <strong>${(cur.Wq / at85).toFixed(1)}×</strong> what it would be at 85% utilization.`;
+  } else if (cur.rho >= 0.75) {
+    insight = `Inside the 75–90% target band: lots spend <strong>${Math.round(cur.Wq / cur.cycleTime * 100)}%</strong> of their cycle time here in queue rather than processing.`;
+  } else {
+    insight = `Below the 75–90% target band: spare capacity, and lots spend only <strong>${Math.round(cur.Wq / cur.cycleTime * 100)}%</strong> of their cycle time here in queue.`;
+  }
+  $("answer").innerHTML = `${badge} ${insight}`;
 
-  const was = v => changed ? `<p class="was">data ${v}</p>` : "";
+  // Instrument strip: one bar, five readings.
+  const was = v => changed ? `<p class="was">baseline ${v}</p>` : "";
   const item = (label, value, unit, wasText, key) =>
-    `<div${key ? ' class="key"' : ""}><dt>${label}</dt><dd>${value}${unit ? ` <small>${unit}</small>` : ""}</dd>${wasText}</div>`;
-  const weekly = Calc.weeklyWaitCost(cur, state.waitCost);
-  const weeklyBase = Calc.weeklyWaitCost(base, inputs.costs.waitingPerLotHour.value);
+    `<div${key ? ' class="key"' : ""}><dt>${label}</dt><dd>${value}${unit ? `<small>${unit}</small>` : ""}</dd>${wasText}</div>`;
+  const yearly = Calc.annualWaitCost(cur, state.waitCost);
+  const yearlyBase = Calc.annualWaitCost(base, inputs.costs.waitingPerLotHour.value);
   $("readout").innerHTML =
-    item("Utilization", pct(cur.rho), "", was(pct(base.rho))) +
+    item("Utilization", p1(cur.rho), "", was(p1(base.rho))) +
     item("Queue time", hfmt(cur.Wq), "h", was(`${hfmt(base.Wq)} h`), true) +
     item("Cycle time", hfmt(cur.cycleTime), "h", was(`${hfmt(base.cycleTime)} h`)) +
-    item("WIP in queue", fmt(cur.Lq, 3), "lots", was(fmt(base.Lq, 3))) +
-    item("Queue cost / wk", money(weekly), "", was(money(weeklyBase)));
+    item("WIP in queue", wipFmt(cur.Lq), "lots", was(`${wipFmt(base.Lq)} lots`)) +
+    item("Holding cost / yr", money(yearly), "", was(money(yearlyBase)));
 
   // Chart: the curve for these settings, a moving dot, and a hollow dot for the data as given.
+  $("chart-meta").textContent = `${inputs.toolGroup} · m = ${state.m} · ${state.m === 1 ? "Kingman G/G/1" : `Sakasegawa G/G/${state.m}`}`;
   const el = $("curve");
   const wait = rho => hrs(Calc.sakasegawaWq(state.caSq, cur.ceSq, rho, cur.te, state.m));
   const points = [];
   if (changed && base.stable) points.push({ x: base.rho, y: hrs(base.Wq), cls: "ghost" });
   if (cur.stable) points.push({ x: cur.rho, y: hrs(cur.Wq), cls: "here",
-    label: [changed ? "Your inputs" : "Today", `${pct(cur.rho)} · ${hfmt(cur.Wq)} h`] });
-  el.innerHTML = (cur.stable ? "" : `<p class="warn">Utilization is ${pct(cur.rho)}. At 100% or more the queue grows without limit, so there is no average wait.</p>`) +
+    label: [changed ? "Your inputs" : "Baseline", `${p1(cur.rho)} · ${hfmt(cur.Wq)} h`] });
+  el.innerHTML = (cur.stable ? "" : `<p class="warn">Utilization is ${p1(cur.rho)}. At 100% or more the queue grows without limit, so there is no average queue time.</p>`) +
     lineChart({
       width: el.clientWidth, xMin: 0.3, xMax: 0.99, yCapAt: 0.95,
       xTicks: [0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9], xTicksNarrow: [0.3, 0.5, 0.7, 0.9], xFmt: x => `${Math.round(x * 100)}%`,
       xLabel: "Utilization ρ", yLabel: "Queue time Wq (h)",
+      zone: { x0: 0.75, x1: 0.90, label: "Target fab operating band (75–90%)", short: "Target 75–90%" },
       series: [{ fn: wait, cls: "line" }], points,
-      aria: `Average wait rises sharply as utilization approaches 100 percent. These settings: ${pct(cur.rho)} utilization, ${hfmt(cur.Wq)} hour wait.`,
+      aria: `Queue time rises sharply as utilization approaches 100 percent. These settings: ${p1(cur.rho)} utilization, ${hfmt(cur.Wq)} hour queue time.`,
     });
-  $("chart-legend").innerHTML = `<span class="item">${WAFER_KEY}${changed ? "Your inputs" : "Today (SMT2020 data)"}</span>` +
-    (changed && base.stable ? `<span class="item"><span class="key-ghost"></span>Today</span>` : "");
+  $("chart-legend").innerHTML = `<span class="item">${WAFER_KEY}${changed ? "Your inputs" : "Baseline (SMT2020 data)"}</span>` +
+    (changed && base.stable ? `<span class="item"><span class="key-ghost"></span>Baseline</span>` : "");
 
-  // Payback for each fix, starting from these settings.
+  // Payback for each fix, starting from these settings. The winner gets a tag, nothing else.
   const target = inputs.scenarios.reworkTarget.value;
   const add = runWith({ m: state.m + inputs.scenarios.addSteppers });
   const eAdd = Calc.fixEconomics(cur, add, state.stepperCost, state.waitCost, 5, inputs.costs.extraStepper.annualOperatingCost || 0);
   const why = { "current-unstable": "Over capacity now", "fix-unstable": "Still over capacity",
-    "no-wait-cost": "Enter the cost of waiting", "no-fix-cost": "Enter the cost of the fix" };
-  const line = (title, change, e, extra) => `
+    "no-wait-cost": "Enter the holding cost rate", "no-fix-cost": "Enter the cost of the fix" };
+  const cut = target == null ? null : runWith({ reworkProb: target });
+  const eCut = cut && Calc.fixEconomics(cur, cut, state.projectCost, state.waitCost, 5, inputs.costs.reworkProject.annualOperatingCost || 0);
+  const bestFix = eCut && eAdd.status === "ok" && eCut.status === "ok"
+    ? (eAdd.paybackYears <= eCut.paybackYears ? "add" : "cut") : null;
+  const line = (key, title, change, e, extra) => `
     <div class="payback-row">
-      <div><strong>${title}</strong><span>${change}</span></div>
+      <div><strong>${title}</strong>${bestFix === key ? ` <span class="label-tag">Pays back sooner</span>` : ""}<span>${change}</span></div>
       <div class="payback-value">${e.status === "ok" ? yearsFmt(e.paybackYears) : `<span class="muted">${why[e.status]}</span>`}</div>
       ${e.status === "ok" ? `<p class="muted">Saves ${money(e.annualSavings)}/yr${extra}</p>` : ""}
     </div>`;
-  let html = line("Add a stepper", `${state.m} → ${state.m + inputs.scenarios.addSteppers} · ${money(state.stepperCost)}`, eAdd,
+  let html = line("add", "Add a stepper", `${state.m} → ${state.m + inputs.scenarios.addSteppers} · ${money(state.stepperCost)}`, eAdd,
     add.stable ? ` · queue time ${hfmt(add.Wq)} h` : "");
   if (target == null) {
-    html += `<div class="payback-row"><div><strong>Cut the rework rate</strong><span>Target not set yet</span></div>
-      <div class="payback-value"><span class="muted">Waiting on Peixuan’s target</span></div></div>`;
+    html += `<div class="payback-row"><div><strong>Cut rework</strong><span>Target rework rate not configured</span></div>
+      <div class="payback-value"><span class="muted">—</span></div></div>`;
   } else {
-    const cut = runWith({ reworkProb: target });
-    const eCut = Calc.fixEconomics(cur, cut, state.projectCost, state.waitCost, 5, inputs.costs.reworkProject.annualOperatingCost || 0);
-    html += line("Cut rework", `${pct(state.reworkProb, 2)} → ${pct(target, 2)} · ${money(state.projectCost)}`, eCut,
+    html += line("cut", "Cut rework", `${p1(state.reworkProb)} → ${p1(target)} · ${money(state.projectCost)}`, eCut,
       cut.stable ? ` · queue time ${hfmt(cut.Wq)} h` : "");
   }
-  html += `<p class="muted small">Before operating costs.</p>`;
-  $("paybacks").innerHTML = html;
+  $("paybacks").innerHTML = `<div class="payback-list">${html}</div>`;
 
   const chain = [
-    ["Arrival rate", "λ = Σ r<sub>i</sub> · E[N<sub>i</sub>]", `${fmt(cur.lambdaPerHour, 4)} /h`],
-    ["Job mix", "c<sub>0</sub>² = Var(S<sub>0</sub>) / t̄<sub>0</sub>²", fmt(cur.c0Sq, 4)],
-    ["Availability", "A = 1 / (1 + Σ m<sub>r</sub>/m<sub>f</sub>)", pct(cur.A, 4)],
-    ["Effective time", "t<sub>e</sub> = t̄<sub>0</sub> / A", `${fmt(cur.te, 4)} min`],
-    ["Effective SCV", "c<sub>e</sub>² = c<sub>0</sub>² + A²K / t̄<sub>0</sub>", fmt(cur.ceSq, 4)],
-    ["Utilization", `ρ = λ t<sub>e</sub> / m, m = ${state.m}`, pct(cur.rho, 4)],
+    ["Arrival rate", "λ = Σ r<sub>i</sub> · E[N<sub>i</sub>]", `${cur.lambdaPerHour.toFixed(3)} /h`],
+    ["Job mix", "c<sub>0</sub>² = Var(S<sub>0</sub>) / t̄<sub>0</sub>²", cur.c0Sq.toFixed(3)],
+    ["Availability", "A = 1 / (1 + Σ m<sub>r</sub>/m<sub>f</sub>)", p1(cur.A)],
+    ["Effective time", "t<sub>e</sub> = t̄<sub>0</sub> / A", `${cur.te.toFixed(2)} min`],
+    ["Effective SCV", "c<sub>e</sub>² = c<sub>0</sub>² + A²K / t̄<sub>0</sub>", cur.ceSq.toFixed(3)],
+    ["Utilization", `ρ = λ t<sub>e</sub> / m, m = ${state.m}`, p1(cur.rho)],
     ["Queue time", "W<sub>q</sub> = ½(c<sub>a</sub>² + c<sub>e</sub>²) · ρ<sup>√(2(m+1))−1</sup> / m(1−ρ) · t<sub>e</sub>", `${hfmt(cur.Wq)} h`],
-    ["WIP in queue", "L<sub>q</sub> = λ W<sub>q</sub>", cur.stable ? `${fmt(cur.Lq, 4)} lots` : "∞"],
+    ["WIP in queue", "L<sub>q</sub> = λ W<sub>q</sub>", `${wipFmt(cur.Lq)} lots`],
   ];
   $("route").innerHTML = chain.map(([name, eq, v]) =>
     `<li><span class="chain-name">${name}</span><span class="eq">${eq}</span><span class="val">${v}</span></li>`).join("");
 }
 
+// One status line under the tabs, shared by every page.
+function renderStatus() {
+  const fixedPage = currentPage === "data" || currentPage === "check";
+  const d = defaults(), diffs = [];
+  if (state.m !== d.m) diffs.push(`${state.m} steppers`);
+  if (Math.abs(state.reworkProb - d.reworkProb) > 1e-9) diffs.push(`rework ${p1(state.reworkProb)}`);
+  if (Math.abs(state.availability - d.availability) >= 5e-4) diffs.push(`A ${p1(state.availability)}`);
+  if (Math.abs(state.caSq - d.caSq) > 1e-9) diffs.push(`cₐ² ${state.caSq.toFixed(2)}`);
+  if (state.waitCost !== d.waitCost) diffs.push(`holding cost rate ${money(state.waitCost)}/lot-h`);
+  if (state.stepperCost !== d.stepperCost) diffs.push(`stepper ${money(state.stepperCost)}`);
+  if (state.projectCost !== d.projectCost) diffs.push(`project ${money(state.projectCost)}`);
+  const modified = diffs.length > 0 && !fixedPage;
+  $("status-text").innerHTML = fixedPage
+    ? `<span class="status-key">Inputs</span> Baseline (SMT2020 data) · Explore inputs don’t apply on this tab`
+    : modified
+      ? `<span class="status-key modified">Modified</span> ${diffs.join(" · ")}`
+      : `<span class="status-key">Inputs</span> Baseline (SMT2020 data)`;
+  $("status-reset").hidden = !modified;
+}
+
 function syncControls() {
   document.querySelectorAll("[data-key]").forEach(el => {
     const v = state[el.dataset.key];
-    el.value = v == null ? "" : (el.type === "number" ? Number(v.toFixed(2)) : v);
+    const scale = Number(el.dataset.scale || 1);
+    el.value = v == null ? "" : (el.type === "number" ? Number((v / scale).toFixed(scale > 1 ? 1 : 2)) : v);
     el.removeAttribute("aria-invalid");
   });
+  // Each slider gets its min and max at the ends and a tick at the SMT2020 data value.
   const d = defaults();
-  $("hint-rework").textContent = `Data ${pct(d.reworkProb, 2)}`;
-  $("hint-A").textContent = `Data ${(base.A * 100).toFixed(1)}% · scales breakdown and PM frequency`;
-  $("hint-ca").textContent = `Assumed ${fmt(inputs.caSq)}`;
+  document.querySelectorAll('input[type="range"]').forEach(el => {
+    let sc = el.nextElementSibling;
+    if (!sc || !sc.classList.contains("range-scale")) {
+      sc = document.createElement("div");
+      sc.className = "range-scale";
+      sc.setAttribute("aria-hidden", "true");
+      el.after(sc);
+    }
+    const key = el.dataset.key, min = Number(el.min), max = Number(el.max);
+    const f = RANGE_FMT[key] || (x => x);
+    const p = Math.min(1, Math.max(0, (d[key] - min) / (max - min)));
+    sc.innerHTML = `<span>${f(min)}</span><span class="range-mark" style="left: calc(${(p * 100).toFixed(2)}% + ${(6 - 12 * p).toFixed(2)}px)" title="Data: ${f(d[key])}"></span><span>${f(max)}</span>`;
+  });
+  $("hint-A").textContent = "Scales breakdown and PM frequency";
 }
 
 function onInput(e) {
@@ -356,17 +413,17 @@ function onInput(e) {
     const v = el.value.trim(), n = Number(v);
     const ok = v !== "" && Number.isFinite(n) && n >= 0;
     el.toggleAttribute("aria-invalid", v !== "" && !ok);
-    state[key] = ok ? n : null;
+    state[key] = ok ? n * Number(el.dataset.scale || 1) : null;
   }
   safeRenderExplore();
 }
 
 function safeRenderExplore() {
-  try { renderExplore(); renderScenarios(); renderCosts(); }
+  try { renderExplore(); renderScenarios(); renderCosts(); renderStatus(); }
   catch (err) { $("answer").innerHTML = `<span class="warn-text">These settings can’t be calculated:</span> ${err.message}`; }
 }
 
-/* ---------- Data and Checks (data as given; sliders don't change these) ---------- */
+/* ---------- Data and Checks (baseline only; sliders don't change these) ---------- */
 function placeholderItems() {
   const items = [];
   for (const [product, lotTypes] of Object.entries(inputs.products)) {
@@ -385,13 +442,21 @@ function placeholderItems() {
       items.push([`${d.name}: how long`, d.mrMin, "min", d.source]);
     }
   }
-  for (const c of Object.values(inputs.costs || {})) items.push([`${c.label} (base)`, c.value, c.unit, c.source]);
-  items.push(["Target rework rate for 072_Litho (Peixuan)", inputs.scenarios.reworkTarget.value, "decimal", inputs.scenarios.reworkTarget.source]);
+  for (const c of Object.values(inputs.costs || {})) items.push([`${c.label} (baseline)`, c.value, c.unit, c.source]);
+  items.push(["Target rework rate, 072_Litho", inputs.scenarios.reworkTarget.value, "%", inputs.scenarios.reworkTarget.source]);
   items.push(["Yearly operating cost of the extra stepper", inputs.costs.extraStepper.annualOperatingCost, "$ per year",
     inputs.costs.extraStepper.annualOperatingCost != null ? "Team" : ""]);
   items.push(["Yearly operating cost of the rework project", inputs.costs.reworkProject.annualOperatingCost, "$ per year",
     inputs.costs.reworkProject.annualOperatingCost != null ? "Team" : ""]);
   return items;
+}
+
+// Data tab values in the same format they have everywhere else: money as money, rates as percents.
+function inputValueFmt(v, unit) {
+  if (v == null) return "—";
+  if (unit.startsWith("$")) return money(v);
+  if (unit === "%") return p1(v);
+  return v.toLocaleString("en-US", { maximumFractionDigits: 2 });
 }
 
 function renderData() {
@@ -401,9 +466,9 @@ function renderData() {
         <th class="num">Lot time ± SD (min)</th><th class="num">Rework</th><th class="num">Visits per h</th><th class="num">Share</th></tr></thead>
       <tbody>${base.steps.map(s => `
         <tr><td>${s.product}</td><td>${s.step ?? ""} ${s.name ?? ""}</td><td>${s.lotType ?? ""}</td>
-          <td class="num">${fmt(s.releaseIntervalMin, 7)}</td><td class="num">${s.wafersPerLot}</td>
-          <td class="num">${fmt(s.tLot)} ± ${fmt(Math.sqrt(s.varLot), 2)}</td><td class="num">${pct(s.reworkProb ?? 0)}</td>
-          <td class="num">${fmt(s.lambda * 60)}</td><td class="num">${pct(s.share)}</td></tr>`).join("")}
+          <td class="num">${s.releaseIntervalMin.toLocaleString("en-US", { maximumFractionDigits: 2 })}</td><td class="num">${s.wafersPerLot}</td>
+          <td class="num">${s.tLot.toFixed(1)} ± ${Math.sqrt(s.varLot).toFixed(2)}</td><td class="num">${p1(s.reworkProb ?? 0)}</td>
+          <td class="num">${(s.lambda * 60).toFixed(3)}</td><td class="num">${p1(s.share)}</td></tr>`).join("")}
       </tbody>
     </table>`;
 
@@ -412,8 +477,8 @@ function renderData() {
       <thead><tr><th>Source</th><th class="num">Every (min)</th><th class="num">Lasts (min)</th>
         <th class="num">Share of time down</th><th class="num">c<sub>r</sub>²</th><th class="num">K<sub>j</sub> (min)</th></tr></thead>
       <tbody>${base.interruptions.map(d => `
-        <tr><td>${d.name}</td><td class="num">${fmt(d.mfMin, 6)}</td><td class="num">${fmt(d.mrMin, 6)}</td>
-          <td class="num">${pct(d.ratio / (1 + base.R))}</td><td class="num">${fmt(d.crSq)}</td><td class="num">${fmt(d.K)}</td></tr>`).join("")}
+        <tr><td>${d.name}</td><td class="num">${d.mfMin.toLocaleString("en-US", { maximumFractionDigits: 2 })}</td><td class="num">${d.mrMin.toLocaleString("en-US", { maximumFractionDigits: 2 })}</td>
+          <td class="num">${p1(d.ratio / (1 + base.R))}</td><td class="num">${d.crSq.toFixed(3)}</td><td class="num">${d.K.toFixed(2)}</td></tr>`).join("")}
       </tbody>
     </table>`;
 
@@ -425,7 +490,7 @@ function renderData() {
       <thead><tr><th>Item</th><th class="num">Value</th><th>Unit</th><th>Source</th><th>Status</th></tr></thead>
       <tbody>${items.map(([label, v, unit, src]) => {
         const ok = v != null && !!src;
-        return `<tr${ok ? "" : ' class="missing"'}><td>${label}</td><td class="num">${v == null ? "—" : fmt(v, 8)}</td><td>${unit}</td>
+        return `<tr${ok ? "" : ' class="missing"'}><td>${label}</td><td class="num">${inputValueFmt(v, unit)}</td><td>${unit}</td>
           <td class="src">${src || "—"}</td><td class="${ok ? "pass" : "fail"}">${ok ? "Filled" : "Missing"}</td></tr>`;
       }).join("")}
       </tbody>
@@ -433,58 +498,48 @@ function renderData() {
 
 }
 
-/* ---------- Costs (Phase 2: delay cost of the current state) ---------- */
-// Costs follows the Explore settings: lots waiting from the sliders, cost of waiting from the cost box.
+/* ---------- Costs (Phase 2: holding cost of the queue) ---------- */
+// Costs follows the Explore settings: WIP in queue from the sliders, holding cost rate from the cost field.
 // The assumptions table always shows the sourced baselines.
 function renderCosts() {
-  const r = runWith(), HPW = Calc.HOURS_PER_WEEK;
+  const r = runWith();
   const wait = inputs.costs.waitingPerLotHour;
-  const c$ = state.waitCost;                       // cost of waiting in use (cost box)
-  const weekly = Calc.weeklyWaitCost(r, c$);
+  const c$ = state.waitCost;                       // holding cost rate in use ($/lot-h, cost box)
   const isBaseline = c$ != null && Math.abs(c$ - wait.value) < 1e-9;
-
-  const changed = !atDefaults();
-  $("cost-settings").innerHTML = changed
-    ? `Your Explore inputs · <a href="#explore">change or reset</a>`
-    : `Data as given · <a href="#explore">change on Explore</a>`;
-  $("cost-settings").classList.toggle("changed", changed);
 
   $("cost-answer").innerHTML = !r.stable
     ? `Over capacity: the queue and its cost grow without limit.`
     : c$ == null
-      ? `<strong>${fmt(r.Lq, 3)} lots</strong> in queue. Enter a cost of waiting on <a href="#explore">Explore</a>.`
-      : `<strong>${fmt(r.Lq, 3)} lots</strong> in queue at ${money(c$)}/lot-h: <strong>${money(weekly)} a week</strong>, ${money(Calc.annualWaitCost(r, c$))} a year in holding cost.`;
+      ? `WIP in queue: <strong>${wipFmt(r.Lq)} lots</strong>. Enter a holding cost rate on <a href="#explore">Explore</a>.`
+      : `Holding cost: <strong>${money(Calc.annualWaitCost(r, c$))}/yr</strong>, from ${wipFmt(r.Lq)} lots of WIP in queue at a holding cost rate of ${money(c$)}/lot-h.`;
 
   $("cost-worked").innerHTML = r.stable && c$ != null ? `
     <ol class="worked-steps">
       <li><span>WIP in queue (Little’s Law)</span>
-        <code>L<sub>q</sub> = λ × W<sub>q</sub> = ${fmt(r.lambda, 6)} visits/min × ${fmt(r.Wq, 6)} min = ${fmt(r.Lq, 6)} lots</code></li>
-      <li><span>Cost of waiting per lot-hour</span>
+        <code>L<sub>q</sub> = λ × W<sub>q</sub> = ${r.lambdaPerHour.toFixed(3)} /h × ${hfmt(r.Wq)} h = ${wipFmt(r.Lq)} lots</code></li>
+      <li><span>Holding cost rate</span>
         <code>${isBaseline
-          ? `25 wafers × ${money(wait.parts.base.waferCost)} × ${pct(wait.parts.base.carryingRate, 2)} ÷ 8,760 h = ${money(c$)} (Isabella’s baseline)`
-          : `${money(c$)}, entered on Explore (baseline ${money(wait.value)})`}</code></li>
-      <li><span>Delay cost / week</span>
-        <code>${fmt(r.Lq, 6)} lots × ${HPW} h × ${money(c$)} = ${money(weekly)}</code></li>
-      <li><span>Delay cost / year</span>
-        <code>${fmt(r.Lq, 6)} lots × ${money(c$)} × ${Calc.HOURS_PER_YEAR.toLocaleString("en-US")} h = ${money(Calc.annualWaitCost(r, c$))}</code></li>
+          ? `25 wafers × ${money(wait.parts.base.waferCost)} × ${Math.round(wait.parts.base.carryingRate * 100)}% ÷ 8,760 h = ${money(c$)}/lot-h (baseline)`
+          : `${money(c$)}/lot-h, entered on Explore (baseline: ${money(wait.value)}/lot-h)`}</code></li>
+      <li><span>Holding cost / yr</span>
+        <code>${wipFmt(r.Lq)} lots × ${money(c$)}/lot-h × ${Calc.HOURS_PER_YEAR.toLocaleString("en-US")} h = ${money(Calc.annualWaitCost(r, c$))}</code></li>
     </ol>` : "";
 
   const cases = [
-    ["28nm wafer, 20% carrying", wait.low],
-    ["28nm wafer, 25% carrying (baseline)", wait.value],
-    ["28nm wafer, 30% carrying", Calc.carryingCostPerLotHour(25, wait.parts.low.waferCost, wait.parts.high.carryingRate)],
-    ["Advanced wafer, 20% carrying", Calc.carryingCostPerLotHour(25, wait.parts.high.waferCost, wait.parts.low.carryingRate)],
-    ["Advanced wafer, 30% carrying", wait.high],
+    ["28nm wafer, 20% holding rate", wait.low],
+    ["28nm wafer, 25% holding rate (baseline)", wait.value],
+    ["28nm wafer, 30% holding rate", Calc.carryingCostPerLotHour(25, wait.parts.low.waferCost, wait.parts.high.carryingRate)],
+    ["Advanced wafer, 20% holding rate", Calc.carryingCostPerLotHour(25, wait.parts.high.waferCost, wait.parts.low.carryingRate)],
+    ["Advanced wafer, 30% holding rate", wait.high],
   ];
   if (c$ != null && !cases.some(([, v]) => Math.abs(v - c$) < 0.005)) cases.push(["Your value on Explore", c$]);
   cases.sort((x, y) => x[1] - y[1]);
   $("cost-range").innerHTML = `
     <table>
-      <thead><tr><th>Cost of waiting</th><th class="num">$ per lot-hour</th><th class="num">Per week</th><th class="num">Per year</th></tr></thead>
+      <thead><tr><th>Case</th><th class="num">Holding cost rate</th><th class="num">Holding cost / yr</th></tr></thead>
       <tbody>${cases.map(([label, c]) => {
-        const w = Calc.weeklyWaitCost(r, c);
         const inUse = c$ != null && Math.abs(c - c$) < 0.005;
-        return `<tr${inUse ? ' class="in-use"' : ""}><td>${label}${inUse ? ' <span class="label-tag in-use-label">in use</span>' : ""}</td><td class="num">${money(c)}</td><td class="num">${money(w)}</td><td class="num">${money(Calc.annualWaitCost(r, c))}</td></tr>`;
+        return `<tr${inUse ? ' class="in-use"' : ""}><td>${label}${inUse ? ' <span class="label-tag in-use-label">in use</span>' : ""}</td><td class="num">${money(c)}/lot-h</td><td class="num">${money(Calc.annualWaitCost(r, c))}</td></tr>`;
       }).join("")}</tbody>
     </table>`;
 
@@ -496,107 +551,121 @@ function renderCosts() {
       <tbody>
         ${[c.waitingPerLotHour, c.extraStepper, c.reworkProject].map(x =>
           `<tr><td>${x.label} <span class="muted">(${x.unit})</span></td><td class="num">${money(x.value)}</td><td class="num">${rangeTxt(x)}</td><td class="src">${x.source}</td></tr>`).join("")}
-        <tr><td>Hours per week / year</td><td class="num">${HPW} / ${Calc.HOURS_PER_YEAR.toLocaleString("en-US")}</td><td class="num">—</td><td class="src">The SMT2020 fab runs around the clock (H = 365 × 24 in the Detailed Calculations).</td></tr>
+        <tr><td>Hours per year</td><td class="num">${Calc.HOURS_PER_YEAR.toLocaleString("en-US")}</td><td class="num">—</td><td class="src">The SMT2020 fab runs around the clock (H = 365 × 24 in the Detailed Calculations).</td></tr>
       </tbody>
     </table>`;
 }
 
-/* ---------- Scenarios (Module 3) ---------- */
+/* ---------- Scenarios (Module 3): one comparison table ---------- */
 
 // Scenarios start from the Explore settings (sliders and cost boxes). At the defaults, the
 // current state is the validated hand calculation.
 function renderScenarios() {
   const target = inputs.scenarios.reworkTarget.value;
   const mNew = state.m + inputs.scenarios.addSteppers;
-  const stepName = reworkStep ? `${reworkStep.name}` : "the rework step";
+  const stepName = reworkStep ? reworkStep.name : "the rework step";
   const fromRate = state.reworkProb;
   const atTarget = target != null && fromRate <= target + 1e-12;
 
   const list = [
-    { key: "current", title: "Current state", change: `${state.m} steppers · ${pct(fromRate, 2)} rework`, whatIf: sliderSettings() },
-    { key: "add", title: "Add a stepper", change: `${state.m} → ${mNew} steppers · ${pct(fromRate, 2)} rework`,
-      whatIf: sliderSettings({ m: mNew }), cost: state.stepperCost, op: inputs.costs.extraStepper.annualOperatingCost },
+    { key: "current", title: "No change", sub: `${state.m} steppers`, whatIf: sliderSettings() },
+    { key: "add", title: "Add a stepper", sub: `${state.m} → ${mNew} steppers`, whatIf: sliderSettings({ m: mNew }),
+      cost: state.stepperCost, op: inputs.costs.extraStepper.annualOperatingCost },
   ];
-  if (target != null) list.push({ key: "cut", title: "Cut rework", change: `${state.m} steppers · ${stepName} ${pct(fromRate, 2)} → ${pct(target, 2)}`,
+  if (target != null) list.push({ key: "cut", title: "Cut rework", sub: `${stepName} ${p1(fromRate)} → ${p1(target)}`,
     whatIf: sliderSettings({ reworkProb: target }), cost: state.projectCost, op: inputs.costs.reworkProject.annualOperatingCost });
-  const runs = Calc.runScenarios(inputs, list);
-  const cur = runs[0].result;
-
-  const why = { "current-unstable": "Current state is over capacity", "fix-unstable": "Still over capacity",
-    "no-wait-cost": "Enter the cost of waiting", "no-fix-cost": "Enter the cost of the fix", "at-target": "Already at the target" };
-  const card = sc => {
-    const r = sc.result;
-    const yearly = Calc.annualWaitCost(r, state.waitCost);
-    const rows = [
-      ["Utilization", pct(r.rho)],
-      ["Queue time", `${hfmt(r.Wq)} h`],
-      ["WIP in queue", r.stable ? fmt(r.Lq, 4) : "∞"],
-      ["Queue cost / yr", money(yearly)],
-    ];
-    let worked = r.stable && state.waitCost != null
-      ? `${fmt(r.Lq, 4)} lots × ${money(state.waitCost)} × ${Calc.HOURS_PER_YEAR.toLocaleString("en-US")} h` : "";
-    if (sc.key !== "current") {
-      const e = (sc.key === "cut" && atTarget) ? { status: "at-target" } : Calc.fixEconomics(cur, r, sc.cost, state.waitCost, 5, sc.op || 0);
-      sc.econ = e;
-      const paybackLabel = sc.op == null ? "Payback, pre-opex" : "Payback";
-      rows.push(
-        ["Savings / yr", e.status === "ok" ? money(e.annualSavings) : "—"],
-        ["One-time cost", money(sc.cost)],
-        [paybackLabel, e.status === "ok" ? yearsFmt(e.paybackYears) : `<span class="reason">${why[e.status]}</span>`],
-      );
-      if (e.status === "ok") worked += `<br>${money(sc.cost)} ÷ ${money(e.annualSavings)}/yr`;
-    }
-    return { ...sc, rows, worked };
-  };
-  const cards = runs.map(card);
-  if (target == null) cards.push({ key: "cut", title: "Cut the rework rate", change: `${stepName}: ${pct(fromRate, 2)} → target not set`, pending: true });
-
-  const fixes = cards.filter(c => c.econ && c.econ.status === "ok");
+  const cols = Calc.runScenarios(inputs, list);
+  const cur = cols[0].result;
+  for (const c of cols.slice(1)) {
+    c.econ = (c.key === "cut" && atTarget) ? { status: "at-target" } : Calc.fixEconomics(cur, c.result, c.cost, state.waitCost, 5, c.op || 0);
+  }
+  if (target == null) cols.push({ key: "cut", title: "Cut rework", sub: "Target rework rate not configured", pending: true });
+  const fixes = cols.filter(c => c.econ && c.econ.status === "ok");
   const best = fixes.length === 2 ? fixes.reduce((x, y) => (x.econ.paybackYears <= y.econ.paybackYears ? x : y)).key : null;
 
-  $("scenario-cards").innerHTML = cards.map(sc => sc.pending ? `
-    <article class="scenario pending">
-      <h3>${sc.title}</h3><p class="change">${sc.change}</p>
-      <p class="pending-note">Waiting on Peixuan’s target rework rate for ${stepName}. Once it is entered in <code>js/app.js</code>, this column fills in.</p>
-    </article>` : `
-    <article class="scenario${best === sc.key ? " best" : ""}">
-      ${best === sc.key ? `<p class="pick">Pays back sooner</p>` : ""}
-      <h3>${sc.title}</h3><p class="change">${sc.change}</p>
-      <dl>${sc.rows.map(([k, v]) => `<div><dt>${k}</dt><dd>${v}</dd></div>`).join("")}</dl>
-      ${sc.worked ? `<p class="worked">${sc.worked}</p>` : ""}
-    </article>`).join("");
+  // Table: metrics as rows, scenarios as columns, change vs. current under each fix value.
+  const minus = s => s.replace("-", "−");
+  const rel = (v, c) => (Number.isFinite(v) && Number.isFinite(c) && c !== 0) ? minus(`${v >= c ? "+" : ""}${Math.round((v / c - 1) * 100)}%`) : "";
+  const why = { "current-unstable": "Current over capacity", "fix-unstable": "Still over capacity",
+    "no-wait-cost": "Enter holding cost rate", "no-fix-cost": "Enter fix cost", "at-target": "Already at target" };
+  const yearly = c => Calc.annualWaitCost(c.result, state.waitCost);
+  const rows = [
+    ["Rework rate", c => p1(c.result.steps.find(s => s.reworkProb != null)?.reworkProb ?? 0), null],
+    ["Utilization", c => p1(c.result.rho), c => minus(`${((c.result.rho - cur.rho) * 100) >= 0 ? "+" : ""}${((c.result.rho - cur.rho) * 100).toFixed(1)} pts`)],
+    ["Queue time", c => `${hfmt(c.result.Wq)} h`, c => rel(c.result.Wq, cur.Wq)],
+    ["WIP in queue", c => `${wipFmt(c.result.Lq)} lots`, c => rel(c.result.Lq, cur.Lq)],
+    ["Holding cost / yr", c => money(yearly(c)), c => rel(yearly(c), yearly(cols[0]))],
+    ["Savings / yr", c => c.econ ? (c.econ.status === "ok" ? money(c.econ.annualSavings) : "—") : "", null],
+    ["One-time cost", c => c.econ ? money(c.cost) : "", null],
+    [inputs.costs.extraStepper.annualOperatingCost == null ? "Payback, pre-opex" : "Payback",
+      c => !c.econ ? "" : c.econ.status === "ok" ? yearsFmt(c.econ.paybackYears) : `<span class="reason">${why[c.econ.status]}</span>`, null],
+  ];
+  const cell = (c, f, df) => {
+    if (c.pending) return `<td class="num muted">—</td>`;
+    const v = f(c), dlt = df && c.key !== "current" ? df(c) : "";
+    const tip = v && c.econ?.status === "ok" && f === rows[rows.length - 1][1]
+      ? ` title="${money(c.cost)} ÷ ${money(c.econ.annualSavings)}/yr"` : "";
+    return `<td class="num"${tip}>${v}${dlt ? `<span class="delta">${dlt}</span>` : ""}</td>`;
+  };
+  $("scenario-cards").innerHTML = `
+    <table class="compare">
+      <thead><tr><th>Metric</th>${cols.map(c => `<th class="num">${c.title}${best === c.key ? ` <span class="label-tag">Pays back sooner</span>` : ""}<span class="th-sub">${c.sub}</span></th>`).join("")}</tr></thead>
+      <tbody>${rows.map(([label, f, df]) => `<tr><td>${label}</td>${cols.map(c => cell(c, f, df)).join("")}</tr>`).join("")}</tbody>
+    </table>`;
+  $("scenario-meta").textContent = `${inputs.toolGroup} · holding cost rate ${money(state.waitCost)}/lot-h`;
 
-  // Which settings these are: the data as given, or changed on Explore.
-  const changed = !atDefaults() || state.stepperCost !== defaults().stepperCost || state.projectCost !== defaults().projectCost;
-  $("scenario-settings").innerHTML = changed
-    ? `Your Explore inputs · <a href="#explore">change or reset</a>`
-    : `Data as given · <a href="#explore">change on Explore</a>`;
-  $("scenario-settings").classList.toggle("changed", changed);
-
-  const add = cards.find(c => c.key === "add"), cut = cards.find(c => c.key === "cut");
-  // One sentence per line: the stepper result, then the rework result.
+  // Two-line conclusion above the table, then the key limits in one line.
+  const add = cols.find(c => c.key === "add"), cutC = cols.find(c => c.key === "cut");
   const lines = [];
   if (!cur.stable) {
-    lines.push(`${state.m} steppers at ${pct(cur.rho)} utilization: over capacity.`);
-    lines.push(add.result.stable ? `A ${ordinal(mNew)} stepper brings it back under.` : "One more stepper isn’t enough.");
+    lines.push(`${state.m} steppers at ${p1(cur.rho)} utilization: over capacity. ${add.result.stable ? `A ${ordinal(mNew)} stepper brings it back under.` : "One more stepper isn’t enough."}`);
   } else {
-    lines.push(add.econ.status === "ok"
-      ? `A ${ordinal(mNew)} stepper cuts queue time from ${hfmt(cur.Wq)} to <strong>${hfmt(add.result.Wq)} h</strong> but pays back in <strong>${yearsFmt(add.econ.paybackYears)}</strong>.`
-      : `A ${ordinal(mNew)} stepper cuts queue time from ${hfmt(cur.Wq)} to <strong>${hfmt(add.result.Wq)} h</strong>.`);
-    if (cut?.pending) lines.push("The rework scenario is waiting on Peixuan’s target rate.");
-    else if (atTarget) lines.push(`Rework is already at the ${pct(target, 2)} target.`);
-    else if (cut?.econ.status === "ok") lines.push(`Cutting rework to ${pct(target, 2)} only gets it to ${hfmt(cut.result.Wq)} h, but pays back in <strong>${yearsFmt(cut.econ.paybackYears)}</strong>.`);
-    else if (cut) lines.push(`Cutting rework to ${pct(target, 2)} gets it to ${hfmt(cut.result.Wq)} h.`);
+    lines.push(`A ${ordinal(mNew)} stepper cuts queue time ${rel(add.result.Wq, cur.Wq).replace("−", "")} (${hfmt(cur.Wq)} → <strong>${hfmt(add.result.Wq)} h</strong>)${add.econ.status === "ok" ? ` and pays back in <strong>${yearsFmt(add.econ.paybackYears)}</strong>` : ""}.`);
+    if (cutC?.pending) lines.push("Rework scenario: target rework rate not configured.");
+    else if (atTarget) lines.push(`Rework is already at the ${p1(target)} target.`);
+    else if (cutC) lines.push(`Cutting rework to ${p1(target)} only reaches ${hfmt(cutC.result.Wq)} h${cutC.econ.status !== "ok" ? ""
+      : best === "cut" ? `, but pays back sooner: <strong>${yearsFmt(cutC.econ.paybackYears)}</strong>`
+      : ` and takes <strong>${yearsFmt(cutC.econ.paybackYears)}</strong> to pay back`}.`);
   }
-  $("scenario-answer").innerHTML = lines.map(l => `<span class="line">${l}</span>`).join(" ");
+  const opexMissing = inputs.costs.extraStepper.annualOperatingCost == null || inputs.costs.reworkProject.annualOperatingCost == null;
+  $("scenario-summary").innerHTML = lines.map(l => `<p>${l}</p>`).join("") +
+    `<p class="muted small">Limits: holding cost only, so lost output isn’t counted${opexMissing ? "; paybacks are pre-opex until operating costs are provided" : ""}. <a href="#check">All assumptions</a></p>`;
+}
 
-  const missing = [];
-  if (target == null) missing.push(`Peixuan’s target rework rate for ${stepName}`);
-  if (inputs.costs.extraStepper.annualOperatingCost == null) missing.push("the yearly operating cost of a sixth stepper");
-  if (inputs.costs.reworkProject.annualOperatingCost == null) missing.push("any yearly cost of keeping the rework improvement running");
-  $("scenario-missing").innerHTML = missing.length
-    ? `<strong>Still needed:</strong> ${missing.join("; ")}. Paybacks are pre-opex until then.`
-    : "";
+/* ---------- Validation: sanity checks against theory, and the model's limits (baseline) ---------- */
+const LIMITS = [
+  "Arrival variability cₐ² = 1 is assumed, not measured. It has a large effect on queue time.",
+  "Scheduled PMs are treated as random interruptions; the real PM calendar is not modeled.",
+  "Availability uses A = 1/(1 + Σ mᵣ/m_f) = 87.7%; multiplying PM and breakdown availability gives about 86.9%.",
+  "Hot-lot priority and lot-to-lens restrictions are not modeled; the tool gives average queue times.",
+  "Batching and setups are not modeled: lithography processes one lot at a time, and the dataset has no setup times.",
+  "Sakasegawa is an approximation, most accurate at high utilization. Next step: validate against an SMT2020 simulation run.",
+  "Holding cost only: lost output at a near-bottleneck is not included, so the stepper’s value is understated.",
+  "Yearly operating costs for both fixes are still pending, so paybacks are pre-opex.",
+  "Rework only returns lots to Step 65, so cutting it changes this tool group’s load very little.",
+];
+
+function renderValidationExtras() {
+  const r = base, m = inputs.m;
+  const add = Calc.run(Calc.applyWhatIf(inputs, { m: m + 1 }));
+  const V = (inputs.caSq + r.ceSq) / 2;
+  const alpha = Math.sqrt(2 * (m + 1)) - 1;
+  const U = r.rho ** alpha / (m * (1 - r.rho));
+  const markov = Calc.sakasegawaWq(1, 1, r.rho, r.te, m);
+  const kingmanOk = Math.abs(Calc.sakasegawaWq(1.3, 0.8, 0.7, 50, 1) - (1.05 * (0.7 / 0.3) * 50)) < 1e-9;
+  const checks = [
+    ["Stable: ρ < 1", p1(r.rho), r.rho < 1],
+    ["VUT adds up: V × U × tₑ = Wq", `${V.toFixed(3)} × ${U.toFixed(3)} × ${r.te.toFixed(2)} min = ${(V * U * r.te).toFixed(2)} min`, Math.abs(V * U * r.te - r.Wq) < 1e-6],
+    ["Little’s Law: Lq ÷ λ = Wq", `${(r.Lq / r.lambda).toFixed(2)} min`, Math.abs(r.Lq / r.lambda - r.Wq) < 1e-6],
+    ["Downtime only adds variability: cₑ² ≥ c₀²", `${r.ceSq.toFixed(3)} ≥ ${r.c0Sq.toFixed(3)}`, r.ceSq >= r.c0Sq],
+    ["Sakasegawa = Kingman at m = 1", kingmanOk ? "Equal" : "Different", kingmanOk],
+    ["More capacity, same work: a 6th stepper scales ρ by 5/6", `${p1(r.rho)} → ${p1(add.rho)}`, Math.abs(add.rho - r.rho * m / (m + 1)) < 1e-9],
+    ["Variability matters: queue time vs. an M/M/5 assumption (V = 1)", `${hfmt(r.Wq)} h vs ${hfmt(markov)} h (+${Math.round((r.Wq / markov - 1) * 100)}%)`, r.Wq > markov],
+  ];
+  $("ov-checks").innerHTML = `<table><thead><tr><th>Check</th><th>Result</th><th></th></tr></thead><tbody>${
+    checks.map(([c, v, ok]) => `<tr><td class="wrap">${c}</td><td class="wrap">${v}</td><td class="${ok ? "pass" : "fail"}">${ok ? "Pass" : "Fail"}</td></tr>`).join("")
+  }</tbody></table>`;
+  $("ov-limits").innerHTML = LIMITS.map(l => `<li>${l}</li>`).join("");
 }
 
 /* ---------- Check against the hand calculation ---------- */
@@ -617,18 +686,20 @@ function renderCheck() {
         <tr${x.ok ? "" : ' class="missing"'}><td>${x.label}</td><td class="sym">${x.sym}</td>
           <td class="num">${x.hand}</td><td class="num">${fmt(x.site, 11)}</td>
           <td class="num">${x.rel === 0 ? "0" : `${x.rel.toExponential(1)}`}</td><td>${x.unit}</td>
-          <td class="${x.ok ? "pass" : "fail"}">${x.ok ? "Yes" : "No"}</td></tr>`).join("")}
+          <td><span class="label-tag ${x.ok ? "ok" : "bad"}">${x.ok ? "Yes" : "No"}</span></td></tr>`).join("")}
       </tbody>
     </table>
     <p class="muted">Difference is relative: |site − hand calc| ÷ hand calc. The hand calc is rounded to about 8 significant figures, so anything under 1e-7 counts as a match.
-    Lots waiting (L<sub>q</sub> = λ × W<sub>q</sub> = ${fmt(base.Lq, 6)}) comes from Little’s Law and isn’t in the hand calc.</p>`;
+    WIP in queue (L<sub>q</sub> = λ × W<sub>q</sub> = ${wipFmt(base.Lq)} lots) comes from Little’s Law and isn’t in the hand calc.</p>`;
 }
 
 /* ---------- Pages ---------- */
 function showPage() {
   const name = location.hash.slice(1);
   const page = PAGES.includes(name) ? name : "explore";
+  currentPage = page;
   PAGES.forEach(p => { $(`page-${p}`).hidden = p !== page; });
+  if (state) renderStatus();
   document.querySelectorAll(".tabs a").forEach(a => {
     if (a.dataset.page === page) a.setAttribute("aria-current", "page");
     else a.removeAttribute("aria-current");
@@ -651,11 +722,14 @@ document.addEventListener("DOMContentLoaded", () => {
   }
   renderData();
   renderCheck();
+  renderValidationExtras();
 
   state = defaults();
   syncControls();
   document.querySelectorAll("[data-key]").forEach(el => el.addEventListener("input", onInput));
-  $("reset").addEventListener("click", () => { state = defaults(); syncControls(); safeRenderExplore(); });
+  const resetAll = () => { state = defaults(); syncControls(); safeRenderExplore(); };
+  $("reset").addEventListener("click", resetAll);
+  $("status-reset").addEventListener("click", resetAll);
   safeRenderExplore();   // fills Explore and Scenarios, whichever tab the page opens on
 
   showPage();
